@@ -52,7 +52,14 @@ export default function SettingsPage() {
 
         <div style={{ fontSize: 13, fontWeight: 600, color: '#33324a', marginBottom: 4 }}>Subscription</div>
         <div style={{ background: '#fbf6ec', border: '1px solid rgba(51,50,74,0.1)', borderRadius: 14, padding: 16, marginBottom: 26 }}>
-          {isSubscribed ? (
+          {profile.is_beta_tester ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ background: '#b8935a', color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 100, letterSpacing: '0.02em' }}>
+                BETA TESTER
+              </div>
+              <div style={{ fontSize: 12.5, color: '#5c5642' }}>Unlimited access — thank you for testing!</div>
+            </div>
+          ) : isSubscribed ? (
             <>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#33324a', marginBottom: 4 }}>Afterwords Plus · Monthly</div>
               <div style={{ fontSize: 12.5, color: '#8d8570', marginBottom: 14 }}>Renews on —</div>

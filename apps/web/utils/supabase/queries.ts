@@ -292,6 +292,7 @@ export type Profile = {
   id: string
   reading_level: string
   onboarded: boolean
+  is_beta_tester: boolean
 }
 
 export async function getProfile(): Promise<Profile | null> {

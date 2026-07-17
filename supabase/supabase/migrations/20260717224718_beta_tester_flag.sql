@@ -1,0 +1,1 @@
+alter table profiles add column is_beta_tester boolean default false;

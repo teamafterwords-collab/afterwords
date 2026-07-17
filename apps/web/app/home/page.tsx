@@ -4,8 +4,22 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getBooks, getEntriesForUser, getCheckinCount, type Book, type Entry } from '@/utils/supabase/queries'
 import BottomNav from '@/components/BottomNav'
+import { createClient } from '@/utils/supabase/client'
 
 async function goToCheckin(bookId: string, router: ReturnType<typeof useRouter>) {
+  const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_beta_tester')
+    .eq('id', userData.user?.id)
+    .single()
+
+  if (profile?.is_beta_tester) {
+    router.push(`/checkin/${bookId}`)
+    return
+  }
+
   const count = await getCheckinCount()
   if (count >= 5) {
     router.push('/paywall')
