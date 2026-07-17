@@ -401,3 +401,22 @@ export async function fetchTitleSuggestions(query: string): Promise<TitleSuggest
     return []
   }
 }
+
+
+export async function submitBugReport(page: string, message: string) {
+  const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+  if (!userData.user) return { error: 'Not logged in' }
+
+  const { error } = await supabase.from('bug_reports').insert({
+    user_id: userData.user.id,
+    page,
+    message: message.trim(),
+  })
+
+  if (error) {
+    console.error('submitBugReport failed:', error)
+    return { error: error.message }
+  }
+  return { success: true }
+}
