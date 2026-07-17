@@ -13,8 +13,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-import type { Metadata } from "next";
-
 export const metadata: Metadata = {
   title: "Afterwords · your reading companion",
   description: "A quiet reading journal that asks the right questions after every chapter.",
