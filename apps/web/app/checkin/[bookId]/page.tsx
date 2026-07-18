@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import {
   type Book, type Question,
-  generateCheckinQuestions, generateSingleQuestion, generateReplacementQuestion,
+  generateCheckinQuestions, generateSingleQuestion, generateReplacementQuestion, generateReviewQuestions,
   getFollowUpQuestion, isReflectionShallow,
   saveCheckinEntries, updateBookProgress, incrementCheckinCount, saveQuote, cleanupTranscript,
 } from '@/utils/supabase/queries'
@@ -38,8 +38,18 @@ const pulseKeyframes = `
 `
 
 export default function CheckinPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <CheckinContent />
+    </Suspense>
+  )
+}
+
+function CheckinContent() {
   const router = useRouter()
   const { bookId } = useParams<{ bookId: string }>()
+  const searchParams = useSearchParams()
+  const isReviewMode = searchParams.get('mode') === 'review'
   const supabase = createClient()
 
   const [book, setBook] = useState<Book | null>(null)
@@ -83,9 +93,25 @@ export default function CheckinPage() {
         setLevel(profile.reading_level)
         setIsPlus(!!profile.is_beta_tester)
       }
+
+      if (isReviewMode) {
+        setPhase('loading')
+        const priorQuestions = (b.asked_questions || []).slice(-10)
+        const level2 = profile?.reading_level || 'beginner'
+        const qs = await generateReviewQuestions(b, level2, priorQuestions)
+        if (!qs) {
+          setPhase('error')
+          return
+        }
+        setQuestions(qs)
+        setAnswers(new Array(qs.length).fill(''))
+        setAnswered(new Array(qs.length).fill(null))
+        setQIndex(0)
+        setPhase('questions')
+      }
     }
     load()
-  }, [bookId])
+  }, [bookId, isReviewMode])
 
   if (!book) return <Loading />
 
@@ -304,13 +330,20 @@ export default function CheckinPage() {
   }
 
   const finish = async () => {
-    const range = to === from + 1 ? `${unitLabel}${to}` : `${unitLabel}${from + 1}-${to}`
+    const range = isReviewMode ? 'Review' : (to === from + 1 ? `${unitLabel}${to}` : `${unitLabel}${from + 1}-${to}`)
     await saveCheckinEntries(book.id, questions, answers, range)
-    const status = to >= (totalUnits ?? 0) ? 'finished' : 'currently_reading'
-    const newAsked = [...(book.asked_questions || []), ...questions.map((q) => q.prompt)]
-    await updateBookProgress(book.id, to, status, newAsked)
+
+    if (!isReviewMode) {
+      const status = to >= (totalUnits ?? 0) ? 'finished' : 'currently_reading'
+      const newAsked = [...(book.asked_questions || []), ...questions.map((q) => q.prompt)]
+      await updateBookProgress(book.id, to, status, newAsked)
+    } else {
+      const newAsked = [...(book.asked_questions || []), ...questions.map((q) => q.prompt)]
+      await updateBookProgress(book.id, book.current_chapter, book.status, newAsked)
+    }
+
     await incrementCheckinCount()
-    router.push('/home')
+    router.push(isReviewMode ? `/journal?book=${book.id}` : '/home')
     router.refresh()
   }
 
@@ -329,10 +362,13 @@ export default function CheckinPage() {
       <style>{pulseKeyframes}</style>
       <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: '60px 22px 30px', boxSizing: 'border-box' }}>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: isReviewMode ? 8 : 22 }}>
           <div onClick={() => router.push('/home')} style={{ fontSize: 20, color: '#3A3A38', cursor: 'pointer' }}>←</div>
           <div style={{ fontFamily: 'Fraunces, serif', fontSize: 18, fontWeight: 500, color: '#3A3A38' }}>{book.title}</div>
         </div>
+        {isReviewMode && (
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#6B8F76', marginBottom: 22 }}>Revisiting this book</div>
+        )}
 
         {phase === 'range' && (
           <div>

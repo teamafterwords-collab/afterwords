@@ -143,6 +143,46 @@ If you are not confident about specific plot details for this section, ask a gen
   return questions
 }
 
+export async function generateReviewQuestions(
+  book: Book,
+  level: string,
+  priorQuestions: string[]
+): Promise<Question[] | null> {
+  const { callAI, extractJSON, stripMarkdown } = await import('@/utils/ai')
+
+  const priorList = priorQuestions.length
+    ? `\nQuestions already asked before (do NOT repeat these or ask near-duplicates):\n- ${priorQuestions.join('\n- ')}`
+    : ''
+
+  const prompt = `Someone finished reading "${book.title}" by ${book.author} a while ago and wants to revisit it — testing what they remember and inviting reflection now that time has passed.${priorList}
+
+Generate exactly 2 questions about the book as a whole (not a specific chapter).
+- If level is "beginner": simple multiple-choice questions testing overall recall of the book's key events or ideas.
+- If level is "intermediate": one MC recall question and one open reflection question about how the book has stayed with them.
+- If level is "advanced": two open reflection questions — what's stayed with them, how their view of it has changed, connections to their life now.
+
+Keep every question SHORT and SIMPLE — one sentence, plain everyday words, under 15 words.
+
+Write in plain text only — no markdown, no asterisks, no bold/italic formatting.
+
+Respond with ONLY valid JSON, no markdown fences, no preamble, in this exact shape:
+[{"id":"q1","type":"mc"|"reflect","prompt":"question text","options":["A","B","C","D"],"correctIndex":0}]
+(omit "options"/"correctIndex" when type is "reflect")
+
+If you are not confident about specific plot details, ask a general reflection question instead.`
+
+  const raw = await callAI(prompt)
+  if (!raw) return null
+  const questions = extractJSON<Question[]>(raw)
+  if (!questions || !Array.isArray(questions) || questions.length === 0) return null
+
+  questions.forEach((q) => {
+    q.prompt = stripMarkdown(q.prompt)
+    if (q.options) q.options = q.options.map(stripMarkdown)
+  })
+  return questions
+}
+
 export async function generateSingleQuestion(
   book: Book,
   fromUnit: number,

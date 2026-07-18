@@ -235,7 +235,10 @@ function Shelf({
               {book.status !== 'finished' ? (
                 <div onClick={() => goToCheckin(book.id, router)} style={{ fontSize: 11, fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>Continue →</div>
               ) : (
-                <div onClick={() => router.push(`/journal?book=${book.id}`)} style={{ fontSize: 11, fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>Journal →</div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <div onClick={() => router.push(`/journal?book=${book.id}`)} style={{ fontSize: 11, fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>Journal →</div>
+                  <div onClick={() => router.push(`/checkin/${book.id}?mode=review`)} style={{ fontSize: 11, fontWeight: 600, color: '#6B8F76', cursor: 'pointer' }}>Revisit →</div>
+                </div>
               )}
             </div>
           </div>
