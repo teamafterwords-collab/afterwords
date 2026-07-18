@@ -28,9 +28,38 @@ export async function callAI(prompt: string): Promise<string | null> {
 
 export function extractJSON<T>(raw: string): T | null {
   const cleaned = raw.replace(/```json|```/g, '').trim()
+
+  // If the response starts with { it's an object at the top level — match the outermost braces.
+  // If it starts with [ it's an array — match the outermost brackets.
+  // Checking the first non-whitespace character avoids greedily matching a nested array/object first.
+  const firstChar = cleaned[0]
+
+  if (firstChar === '{') {
+    const objMatch = cleaned.match(/\{[\s\S]*\}/)
+    if (objMatch) {
+      try {
+        return JSON.parse(objMatch[0]) as T
+      } catch {
+        return null
+      }
+    }
+  }
+
+  if (firstChar === '[') {
+    const arrMatch = cleaned.match(/\[[\s\S]*\]/)
+    if (arrMatch) {
+      try {
+        return JSON.parse(arrMatch[0]) as T
+      } catch {
+        return null
+      }
+    }
+  }
+
+  // Fallback: try both patterns in case the response has leading junk before the JSON
   const arrMatch = cleaned.match(/\[[\s\S]*\]/)
   const objMatch = cleaned.match(/\{[\s\S]*\}/)
-  const match = arrMatch || objMatch
+  const match = objMatch && (!arrMatch || objMatch.index! <= arrMatch.index!) ? objMatch : arrMatch
   if (!match) return null
   try {
     return JSON.parse(match[0]) as T

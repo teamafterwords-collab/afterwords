@@ -110,21 +110,27 @@ function OnboardingContent() {
   const article = /^[AEIOU]/i.test(LEVEL_INFO[resultLevel].label) ? 'an' : 'a'
 
   return (
-    <div style={{ minHeight: '100vh', background: '#efe6d3', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', padding: '40px 24px' }}>
+    <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', padding: '40px 24px' }}>
       <div style={{ width: '100%', maxWidth: 380 }}>
 
         {step === 0 && (
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
             <img src="/images/logo.png" alt="Afterwords logo" style={{ width: 96, height: 96, objectFit: 'contain' }} />
-            <div style={{ fontFamily: 'Caveat, cursive', fontSize: 15, color: '#b8935a' }}>a quiet place to remember</div>
-            <div style={{ fontFamily: 'Lora, serif', fontSize: 46, fontWeight: 700, color: '#33324a' }}>Afterwords</div>
-            <img src="/images/welcome-illustration.png" alt="Reader by the window" style={{ width: 220, maxWidth: '100%', borderRadius: 14, marginTop: 6 }} />
+            <div style={{ fontFamily: 'Spectral, serif', fontSize: 16, color: '#6B8F76' }}>a quiet place to remember</div>
+            <div style={{ fontFamily: 'Fraunces, serif', fontSize: 46, fontWeight: 500, color: '#3A3A38' }}>Afterwords</div>
+            <video
+  src="/videos/welcome-illustration.mp4"
+  autoPlay
+  muted
+  playsInline
+  style={{ width: 220, maxWidth: '100%', borderRadius: 14, marginTop: 6 }}
+/>
             <div style={{ fontSize: 15, lineHeight: 1.6, color: '#5c5642', maxWidth: 280 }}>
               A journal for what stays with you after you close the book.
             </div>
             <button
               onClick={() => setStep(1)}
-              style={{ marginTop: 14, background: '#33324a', color: '#f3ecdc', fontWeight: 600, fontSize: 15, padding: '15px 40px', borderRadius: 100, border: 'none', cursor: 'pointer' }}
+              style={{ marginTop: 14, background: '#3A3A38', color: '#f3ecdc', fontWeight: 600, fontSize: 15, padding: '15px 40px', borderRadius: 100, border: 'none', cursor: 'pointer' }}
             >
               Get started
             </button>
@@ -136,7 +142,7 @@ function OnboardingContent() {
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
               <img src={`/images/onboarding-icon-${step}.png`} alt="" style={{ width: 72, height: 72, objectFit: 'contain' }} />
             </div>
-            <div style={{ fontFamily: 'Lora, serif', fontSize: 22, fontWeight: 600, color: '#33324a', marginBottom: 28, lineHeight: 1.4, textAlign: 'center' }}>
+            <div style={{ fontFamily: 'Fraunces, serif', fontSize: 22, fontWeight: 600, color: '#3A3A38', marginBottom: 28, lineHeight: 1.4, textAlign: 'center' }}>
               {currentQ.prompt}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
@@ -144,7 +150,7 @@ function OnboardingContent() {
                 <div
                   key={opt.label}
                   onClick={() => pickAnswer(opt.level)}
-                  style={{ background: '#fbf6ec', border: '1px solid rgba(51,50,74,0.12)', borderRadius: 14, padding: '18px 20px', fontSize: 15, lineHeight: 1.5, color: '#3f3b2e', cursor: 'pointer', textAlign: 'center' }}
+                  style={{ background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 14, padding: '18px 20px', fontSize: 15, lineHeight: 1.5, color: '#3f3b2e', cursor: 'pointer', textAlign: 'center' }}
                 >
                   {opt.label}
                 </div>
@@ -152,7 +158,7 @@ function OnboardingContent() {
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: i === step - 1 ? '#33324a' : 'rgba(51,50,74,0.2)' }} />
+                <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: i === step - 1 ? '#3A3A38' : 'rgba(51,50,74,0.2)' }} />
               ))}
             </div>
           </div>
@@ -161,8 +167,8 @@ function OnboardingContent() {
         {step === 5 && (
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
             <img src={`/images/badge-${resultLevel === 'beginner' ? 'casual' : resultLevel === 'intermediate' ? 'engaged' : 'deep'}.png`} alt="" style={{ width: 96, height: 96, objectFit: 'contain' }} />
-            <div style={{ fontFamily: 'Caveat, cursive', fontSize: 14, color: '#b8935a' }}>your reading style</div>
-            <div style={{ fontFamily: 'Lora, serif', fontSize: 32, fontWeight: 700, color: '#33324a' }}>
+            <div style={{ fontFamily: 'Spectral, serif', fontSize: 16, color: '#6B8F76' }}>your reading style</div>
+            <div style={{ fontFamily: 'Fraunces, serif', fontSize: 32, fontWeight: 500, color: '#3A3A38' }}>
               You&apos;re {article} {LEVEL_INFO[resultLevel].label}
             </div>
             <div style={{ fontSize: 15, lineHeight: 1.65, color: '#5c5642', maxWidth: 280 }}>
@@ -171,11 +177,11 @@ function OnboardingContent() {
             <button
               onClick={finishOnboarding}
               disabled={saving}
-              style={{ marginTop: 18, background: '#33324a', color: '#f3ecdc', fontWeight: 600, fontSize: 15, padding: '15px 40px', borderRadius: 100, border: 'none', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}
+              style={{ marginTop: 18, background: '#3A3A38', color: '#f3ecdc', fontWeight: 600, fontSize: 15, padding: '15px 40px', borderRadius: 100, border: 'none', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}
             >
               {saving ? 'Saving…' : 'Enter Afterwords'}
             </button>
-            <div style={{ fontSize: 12, color: '#8d8570', marginTop: 2 }}>You can change this anytime in Settings.</div>
+            <div style={{ fontSize: 12, color: '#8A8880', marginTop: 2 }}>You can change this anytime in Settings.</div>
           </div>
         )}
 

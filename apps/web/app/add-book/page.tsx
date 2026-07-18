@@ -6,7 +6,6 @@ import { addBook, fetchTitleSuggestions, type TitleSuggestion } from '@/utils/su
 
 const COVER_COLORS = ['#3b3a5c', '#4b5d45', '#7c4a3a', '#8a6a3d', '#2f4858', '#5c4033']
 
-type TrackingMode = 'chapter' | 'page'
 type Status = 'want_to_read' | 'currently_reading' | 'finished'
 
 export default function AddBookPage() {
@@ -15,10 +14,9 @@ export default function AddBookPage() {
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [genre, setGenre] = useState('')
-  const [trackingMode, setTrackingMode] = useState<TrackingMode>('chapter')
-  const [total, setTotal] = useState('')
+  const [totalPages, setTotalPages] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
-  const [status, setStatus] = useState<Status>('want_to_read')
+  const [status, setStatus] = useState<Status>('currently_reading')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,7 +26,7 @@ export default function AddBookPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const suggestCache = useRef<Record<string, TitleSuggestion[]>>({})
 
-  const isValid = title.trim() && author.trim() && total.trim()
+  const isValid = title.trim() && author.trim() && totalPages.trim()
 
   const handleTitleChange = (val: string) => {
     setTitle(val)
@@ -58,8 +56,7 @@ export default function AddBookPage() {
     setTitle(s.title)
     setAuthor(s.author)
     setGenre(s.genre)
-    setTrackingMode(s.trackingMode)
-    setTotal(String(s.trackingMode === 'page' ? s.totalPages ?? '' : s.totalChapters ?? ''))
+    setTotalPages(String(s.totalPages ?? ''))
     setCoverUrl(s.coverUrl)
     setSuggestions([])
     setShowSuggestions(false)
@@ -70,16 +67,16 @@ export default function AddBookPage() {
     setSaving(true)
     setError(null)
 
-    const totalNum = Math.max(1, parseInt(total, 10) || 1)
+    const totalNum = Math.max(1, parseInt(totalPages, 10) || 1)
     const finalCoverColor = COVER_COLORS[Math.floor(Math.random() * COVER_COLORS.length)]
 
     const result = await addBook({
       title: title.trim(),
       author: author.trim(),
       genre: genre.trim(),
-      tracking_mode: trackingMode,
-      total_chapters: trackingMode === 'chapter' ? totalNum : null,
-      total_pages: trackingMode === 'page' ? totalNum : null,
+      tracking_mode: 'page',
+      total_chapters: null,
+      total_pages: totalNum,
       status,
       cover_color: finalCoverColor,
       cover_url: coverUrl,
@@ -96,11 +93,11 @@ export default function AddBookPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#efe6d3', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '60px 22px 40px' }}>
+    <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: '60px 22px 40px', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-          <div onClick={() => router.push('/home')} style={{ fontSize: 20, color: '#33324a', cursor: 'pointer' }}>←</div>
-          <div style={{ fontFamily: 'Lora, serif', fontSize: 20, fontWeight: 700, color: '#33324a' }}>Add a book</div>
+          <div onClick={() => router.push('/home')} style={{ fontSize: 20, color: '#3A3A38', cursor: 'pointer' }}>←</div>
+          <div style={{ fontFamily: 'Fraunces, serif', fontSize: 20, fontWeight: 500, color: '#3A3A38' }}>Add a book</div>
         </div>
 
         <div style={{ marginBottom: 14 }}>
@@ -112,20 +109,20 @@ export default function AddBookPage() {
               style={inputStyle}
             />
             {suggestLoading && (
-              <div style={{ position: 'absolute', right: 14, top: 14, fontSize: 12, color: '#8d8570' }}>…</div>
+              <div style={{ position: 'absolute', right: 14, top: 14, fontSize: 12, color: '#8A8880' }}>…</div>
             )}
             {showSuggestions && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fbf6ec', border: '1px solid rgba(51,50,74,0.14)', borderRadius: 10, boxShadow: '0 8px 20px rgba(0,0,0,0.12)', zIndex: 30, overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 10, boxShadow: '0 8px 20px rgba(0,0,0,0.12)', zIndex: 30, overflow: 'hidden' }}>
                 {suggestions.map((s, i) => (
                   <div
                     key={i}
                     onClick={() => pickSuggestion(s)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', borderBottom: i < suggestions.length - 1 ? '1px solid rgba(51,50,74,0.08)' : 'none' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', borderBottom: i < suggestions.length - 1 ? '1px solid rgba(58,58,56,0.08)' : 'none' }}
                   >
                     <div style={{ width: 30, height: 42, borderRadius: 3, backgroundColor: '#d9d0bc', backgroundImage: s.coverUrl ? `url(${s.coverUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }} />
                     <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 600, color: '#33324a' }}>{s.title}</div>
-                      <div style={{ fontSize: 12, color: '#8d8570', marginTop: 1 }}>{s.author}</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: '#3A3A38' }}>{s.title}</div>
+                      <div style={{ fontSize: 12, color: '#8A8880', marginTop: 1 }}>{s.author}</div>
                     </div>
                   </div>
                 ))}
@@ -142,26 +139,8 @@ export default function AddBookPage() {
           <input value={genre} onChange={(e) => setGenre(e.target.value)} style={inputStyle} />
         </Field>
 
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#5c5642', marginBottom: 6 }}>Track by</div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          {(['chapter', 'page'] as TrackingMode[]).map((m) => (
-            <div
-              key={m}
-              onClick={() => setTrackingMode(m)}
-              style={{
-                flex: 1, textAlign: 'center', padding: '10px 4px', borderRadius: 10, fontSize: 12.5, cursor: 'pointer',
-                background: trackingMode === m ? '#33324a' : '#fbf6ec',
-                color: trackingMode === m ? '#f3ecdc' : '#5c5642',
-                border: '1px solid rgba(51,50,74,0.14)',
-              }}
-            >
-              {m === 'chapter' ? 'Chapters' : 'Pages'}
-            </div>
-          ))}
-        </div>
-
-        <Field label={trackingMode === 'page' ? 'Total pages' : 'Total chapters'}>
-          <input type="number" value={total} onChange={(e) => setTotal(e.target.value)} style={inputStyle} />
+        <Field label="Total pages">
+          <input type="number" value={totalPages} onChange={(e) => setTotalPages(e.target.value)} style={inputStyle} />
         </Field>
 
         <div style={{ fontSize: 12, fontWeight: 600, color: '#5c5642', marginBottom: 6 }}>Shelf</div>
@@ -176,9 +155,9 @@ export default function AddBookPage() {
               onClick={() => setStatus(s.id)}
               style={{
                 flex: 1, textAlign: 'center', padding: '10px 4px', borderRadius: 10, fontSize: 11.5, cursor: 'pointer',
-                background: status === s.id ? '#33324a' : '#fbf6ec',
+                background: status === s.id ? '#3A3A38' : '#F3F1EC',
                 color: status === s.id ? '#f3ecdc' : '#5c5642',
-                border: '1px solid rgba(51,50,74,0.14)',
+                border: '1px solid rgba(58,58,56,0.08)',
               }}
             >
               {s.label}
@@ -192,7 +171,7 @@ export default function AddBookPage() {
           onClick={handleSubmit}
           disabled={!isValid || saving}
           style={{
-            width: '100%', textAlign: 'center', background: isValid ? '#33324a' : 'rgba(51,50,74,0.3)',
+            width: '100%', textAlign: 'center', background: isValid ? '#3A3A38' : 'rgba(58,58,56,0.3)',
             color: '#f3ecdc', fontWeight: 600, fontSize: 15, padding: 15, borderRadius: 100, border: 'none',
             cursor: isValid ? 'pointer' : 'default',
           }}
@@ -214,6 +193,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', background: '#fbf6ec', border: '1px solid rgba(51,50,74,0.14)', borderRadius: 10,
+  width: '100%', background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 10,
   padding: '12px 14px', fontSize: 14, color: '#3f3b2e', boxSizing: 'border-box',
 }

@@ -5,8 +5,9 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import {
   type Book, type Question,
-  generateCheckinQuestions, getFollowUpQuestion, isReflectionShallow,
-  saveCheckinEntries, updateBookProgress, incrementCheckinCount, saveQuote,
+  generateCheckinQuestions, generateSingleQuestion, generateReplacementQuestion,
+  getFollowUpQuestion, isReflectionShallow,
+  saveCheckinEntries, updateBookProgress, incrementCheckinCount, saveQuote, cleanupTranscript,
 } from '@/utils/supabase/queries'
 
 type Phase = 'range' | 'loading' | 'questions' | 'quotePrompt' | 'error'
@@ -15,17 +16,24 @@ type SpeechRecognitionResultLike = { transcript: string }
 interface SpeechRecognitionLike extends EventTarget {
   lang: string
   interimResults: boolean
+  continuous: boolean
   start: () => void
+  stop: () => void
   onresult: ((e: { results: { 0: { 0: SpeechRecognitionResultLike } } }) => void) | null
   onerror: ((e: { error: string }) => void) | null
   onend: (() => void) | null
 }
 
+function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
+  const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null
+}
+
 const pulseKeyframes = `
 @keyframes mic-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(184,147,90,0.5); }
-  70% { box-shadow: 0 0 0 10px rgba(184,147,90,0); }
-  100% { box-shadow: 0 0 0 0 rgba(184,147,90,0); }
+  0% { box-shadow: 0 0 0 0 rgba(107,143,118,0.5); }
+  70% { box-shadow: 0 0 0 10px rgba(107,143,118,0); }
+  100% { box-shadow: 0 0 0 0 rgba(107,143,118,0); }
 }
 `
 
@@ -47,10 +55,17 @@ export default function CheckinPage() {
   const [followUps, setFollowUps] = useState(0)
 
   const [quoteText, setQuoteText] = useState('')
+  const [quotePage, setQuotePage] = useState('')
   const [showQuoteEntry, setShowQuoteEntry] = useState(false)
 
+  const [skipsUsed, setSkipsUsed] = useState(0)
+  const [isPlus, setIsPlus] = useState(false)
+  const [skipping, setSkipping] = useState(false)
+
   const [micListening, setMicListening] = useState(false)
+  const [micRecognition, setMicRecognition] = useState<SpeechRecognitionLike | null>(null)
   const [quoteMicListening, setQuoteMicListening] = useState(false)
+  const [quoteMicRecognition, setQuoteMicRecognition] = useState<SpeechRecognitionLike | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -63,8 +78,11 @@ export default function CheckinPage() {
       setTo(Math.min(totalUnits ?? f + 1, f + 1))
 
       const { data: userData } = await supabase.auth.getUser()
-      const { data: profile } = await supabase.from('profiles').select('reading_level').eq('id', userData.user?.id).single()
-      if (profile) setLevel(profile.reading_level)
+      const { data: profile } = await supabase.from('profiles').select('reading_level, is_beta_tester').eq('id', userData.user?.id).single()
+      if (profile) {
+        setLevel(profile.reading_level)
+        setIsPlus(!!profile.is_beta_tester)
+      }
     }
     load()
   }, [bookId])
@@ -79,6 +97,21 @@ export default function CheckinPage() {
   const confirmRange = async () => {
     setPhase('loading')
     const priorQuestions = (book.asked_questions || []).slice(-10)
+
+    if (level === 'intermediate') {
+      const q = await generateSingleQuestion(book, from, to, priorQuestions, 'mc')
+      if (!q) {
+        setPhase('error')
+        return
+      }
+      setQuestions([q])
+      setAnswers([''])
+      setAnswered([null])
+      setQIndex(0)
+      setPhase('questions')
+      return
+    }
+
     const qs = await generateCheckinQuestions(book, level, from, to, priorQuestions)
     if (!qs) {
       setPhase('error')
@@ -107,55 +140,93 @@ export default function CheckinPage() {
     setAnswers(newAnswers)
   }
 
-  const startVoiceForReflection = () => {
-    const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition
+  const toggleVoiceForReflection = () => {
+    if (micListening && micRecognition) {
+      micRecognition.stop()
+      return
+    }
+    const SR = getSpeechRecognition()
     if (!SR) {
       alert('Voice input needs microphone access — try this on a deployed HTTPS site.')
       return
     }
     const recog = new SR()
     recog.lang = 'en-US'
+    recog.continuous = true
     recog.interimResults = false
     setMicListening(true)
-    recog.onresult = (e) => {
+    setMicRecognition(recog)
+    recog.onresult = async (e) => {
       const transcript = e.results[0][0].transcript
+      const cleaned = await cleanupTranscript(transcript)
       const existing = answers[qIndex] || ''
-      setReflectAnswer(existing ? existing.trim() + ' ' + transcript : transcript)
+      setReflectAnswer(existing ? existing.trim() + ' ' + cleaned : cleaned)
     }
-    recog.onerror = () => setMicListening(false)
-    recog.onend = () => setMicListening(false)
+    recog.onerror = () => { setMicListening(false); setMicRecognition(null) }
+    recog.onend = () => { setMicListening(false); setMicRecognition(null) }
     recog.start()
   }
 
-  const startVoiceForQuote = () => {
-    const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition
+  const toggleVoiceForQuote = () => {
+    if (quoteMicListening && quoteMicRecognition) {
+      quoteMicRecognition.stop()
+      return
+    }
+    const SR = getSpeechRecognition()
     if (!SR) {
       alert('Voice input needs microphone access — try this on a deployed HTTPS site.')
       return
     }
     const recog = new SR()
     recog.lang = 'en-US'
+    recog.continuous = true
     recog.interimResults = false
     setQuoteMicListening(true)
-    recog.onresult = (e) => {
+    setQuoteMicRecognition(recog)
+    recog.onresult = async (e) => {
       const transcript = e.results[0][0].transcript
-      setQuoteText((prev) => (prev ? prev.trim() + ' ' + transcript : transcript))
+      const cleaned = await cleanupTranscript(transcript)
+      setQuoteText((prev) => (prev ? prev.trim() + ' ' + cleaned : cleaned))
     }
-    recog.onerror = () => setQuoteMicListening(false)
-    recog.onend = () => setQuoteMicListening(false)
+    recog.onerror = () => { setQuoteMicListening(false); setQuoteMicRecognition(null) }
+    recog.onend = () => { setQuoteMicListening(false); setQuoteMicRecognition(null) }
     recog.start()
+  }
+
+  const skipCanUse = isPlus || skipsUsed < 1
+
+  const handleSkip = async () => {
+    if (!skipCanUse || skipping) return
+    setSkipping(true)
+    const currentQ = questions[qIndex]
+    const priorQuestions = [...(book.asked_questions || []), ...questions.map((q) => q.prompt)].slice(-10)
+    const replacement = await generateReplacementQuestion(book, from, to, priorQuestions, currentQ.type)
+    setSkipping(false)
+
+    if (!replacement) return
+
+    const newQuestions = [...questions]
+    newQuestions[qIndex] = replacement
+    setQuestions(newQuestions)
+
+    const newAnswers = [...answers]
+    newAnswers[qIndex] = ''
+    setAnswers(newAnswers)
+
+    const newAnswered = [...answered]
+    newAnswered[qIndex] = null
+    setAnswered(newAnswered)
+
+    if (!isPlus) setSkipsUsed(skipsUsed + 1)
   }
 
   const nextStep = async () => {
     if (!answers[qIndex]) return
     const currentQ = questions[qIndex]
-    const wrongSoFar = answered.filter((a) => a && a.correct === false).length
     const isLastPlanned = qIndex === questions.length - 1
 
+    const wrongSoFar = answered.filter((a) => a && a.correct === false).length
     const shouldAskMoreCasual = level === 'beginner' && isLastPlanned && wrongSoFar > 0 && questions.length < 5
-    const shouldFollowUp = (level === 'intermediate' || level === 'advanced') && isLastPlanned && currentQ.type === 'reflect' && followUps < 1
 
     if (shouldAskMoreCasual) {
       setPhase('loading')
@@ -172,6 +243,40 @@ export default function CheckinPage() {
       }
       return
     }
+
+    if (level === 'intermediate' && currentQ.type === 'mc' && isLastPlanned) {
+      const mcCount = questions.filter((q) => q.type === 'mc').length
+      const wasCorrect = answered[qIndex]?.correct
+      const priorQuestions = [...(book.asked_questions || []), ...questions.map((q) => q.prompt)].slice(-10)
+
+      if (!wasCorrect && mcCount < 3) {
+        setPhase('loading')
+        const nextMc = await generateSingleQuestion(book, from, to, priorQuestions, 'mc')
+        if (nextMc) {
+          setQuestions([...questions, nextMc])
+          setAnswers([...answers, ''])
+          setAnswered([...answered, null])
+          setQIndex(qIndex + 1)
+          setPhase('questions')
+          return
+        }
+      }
+
+      setPhase('loading')
+      const reflectQ = await generateSingleQuestion(book, from, to, priorQuestions, 'reflect')
+      if (reflectQ) {
+        setQuestions([...questions, reflectQ])
+        setAnswers([...answers, ''])
+        setAnswered([...answered, null])
+        setQIndex(qIndex + 1)
+        setPhase('questions')
+        return
+      }
+      await finish()
+      return
+    }
+
+    const shouldFollowUp = (level === 'intermediate' || level === 'advanced') && isLastPlanned && currentQ.type === 'reflect' && followUps < 1
 
     if (shouldFollowUp) {
       const shallow = await isReflectionShallow(answers[qIndex])
@@ -211,7 +316,7 @@ export default function CheckinPage() {
 
   const saveQuoteAndFinish = async () => {
     if (quoteText.trim()) {
-      await saveQuote(book.id, quoteText)
+      await saveQuote(book.id, quoteText, quotePage)
     }
     await finish()
   }
@@ -220,30 +325,52 @@ export default function CheckinPage() {
   const currentAnswered = answered[qIndex]
 
   return (
-    <div style={{ minHeight: '100vh', background: '#efe6d3', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
       <style>{pulseKeyframes}</style>
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '60px 22px 30px' }}>
+      <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: '60px 22px 30px', boxSizing: 'border-box' }}>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 22 }}>
-          <div onClick={() => router.push('/home')} style={{ fontSize: 20, color: '#33324a', cursor: 'pointer' }}>←</div>
-          <div style={{ fontFamily: 'Lora, serif', fontSize: 18, fontWeight: 700, color: '#33324a' }}>{book.title}</div>
+          <div onClick={() => router.push('/home')} style={{ fontSize: 20, color: '#3A3A38', cursor: 'pointer' }}>←</div>
+          <div style={{ fontFamily: 'Fraunces, serif', fontSize: 18, fontWeight: 500, color: '#3A3A38' }}>{book.title}</div>
         </div>
 
         {phase === 'range' && (
           <div>
-            <div style={{ fontFamily: 'Lora, serif', fontSize: 20, fontWeight: 600, color: '#33324a', marginBottom: 8 }}>Mark your progress</div>
+            <div style={{ fontFamily: 'Fraunces, serif', fontSize: 20, fontWeight: 500, color: '#3A3A38', marginBottom: 8 }}>Mark your progress</div>
             <div style={{ fontSize: 14, lineHeight: 1.6, color: '#5c5642', marginBottom: 26 }}>
               You were on {unitLabel}{from} of {totalUnits}. Where did you read to?
             </div>
-            <div style={{ textAlign: 'center', fontFamily: 'Lora, serif', fontSize: 40, fontWeight: 700, color: '#33324a', marginBottom: 14 }}>
-              {unitLabel}{to}
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 20 }}>
+              <div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, fontWeight: 500, color: '#3A3A38' }}>{unitLabel}</div>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={to}
+                min={from}
+                max={totalUnits ?? from + 1}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10)
+                  if (isNaN(val)) { setTo(from); return }
+                  const clamped = Math.max(from, Math.min(totalUnits ?? val, val))
+                  setTo(clamped)
+                }}
+                style={{
+                  width: 110, textAlign: 'center', fontFamily: 'Fraunces, serif', fontSize: 34, fontWeight: 500, color: '#3A3A38',
+                  background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 12, padding: '10px 8px',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ fontSize: 14, color: '#8A8880' }}>/ {totalUnits}</div>
             </div>
+
             <input
               type="range" min={from} max={totalUnits ?? from + 1} value={to}
               onChange={(e) => setTo(parseInt(e.target.value, 10))}
               style={{ width: '100%', marginBottom: 30 }}
             />
-            <button onClick={confirmRange} style={btnStyle('#33324a')}>
+
+            <button onClick={confirmRange} style={btnStyle('#3A3A38')}>
               I&apos;ve read to {unitWord} {to}
             </button>
           </div>
@@ -251,22 +378,22 @@ export default function CheckinPage() {
 
         {phase === 'loading' && (
           <div style={{ textAlign: 'center', padding: '60px 10px' }}>
-            <div style={{ fontFamily: 'Caveat, cursive', fontSize: 15, color: '#b8935a', marginBottom: 8 }}>thinking about your chapter…</div>
-            <div style={{ fontSize: 13, color: '#8d8570' }}>Preparing your check-in</div>
+            <div style={{ fontFamily: 'Spectral, serif', fontStyle: 'italic', fontSize: 16, color: '#6B8F76', marginBottom: 8 }}>thinking about your chapter…</div>
+            <div style={{ fontSize: 13, color: '#8A8880' }}>Preparing your check-in</div>
           </div>
         )}
 
         {phase === 'error' && (
           <div style={{ textAlign: 'center', padding: '60px 10px' }}>
             <div style={{ fontSize: 14, color: '#5c5642', marginBottom: 16 }}>Something went wrong putting together your check-in.</div>
-            <button onClick={confirmRange} style={btnStyle('#33324a')}>Try again</button>
+            <button onClick={confirmRange} style={btnStyle('#3A3A38')}>Try again</button>
           </div>
         )}
 
         {phase === 'questions' && currentQ && (
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#b8935a', marginBottom: 10 }}>Question {qIndex + 1}</div>
-            <div style={{ fontFamily: 'Lora, serif', fontSize: 20, fontWeight: 600, color: '#33324a', marginBottom: 22, lineHeight: 1.45 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#6B8F76', marginBottom: 10 }}>Question {qIndex + 1}</div>
+            <div style={{ fontFamily: 'Fraunces, serif', fontSize: 20, fontWeight: 500, color: '#3A3A38', marginBottom: 22, lineHeight: 1.45 }}>
               {currentQ.prompt}
             </div>
 
@@ -275,13 +402,13 @@ export default function CheckinPage() {
                 {currentQ.options.map((opt, i) => {
                   const isPicked = currentAnswered?.picked === i
                   const isCorrectOpt = currentAnswered && i === currentQ.correctIndex
-                  let bg = '#fbf6ec'
-                  let border = 'rgba(51,50,74,0.12)'
+                  let bg = '#F3F1EC'
+                  let border = 'rgba(58,58,56,0.08)'
                   if (currentAnswered) {
-                    if (isCorrectOpt) { bg = '#eaf0e6'; border = '#4b5d45' }
-                    else if (isPicked) { bg = '#f5e9e4'; border = '#8a4a3a' }
+                    if (isCorrectOpt) { bg = '#EAF0E6'; border = '#6B8F76' }
+                    else if (isPicked) { bg = '#F5E9E4'; border = '#8a4a3a' }
                   } else if (opt === answers[qIndex]) {
-                    border = '#33324a'
+                    border = '#3A3A38'
                   }
                   return (
                     <div
@@ -308,13 +435,13 @@ export default function CheckinPage() {
                   value={answers[qIndex]}
                   onChange={(e) => setReflectAnswer(e.target.value)}
                   placeholder="Take your time…"
-                  style={{ width: '100%', minHeight: 140, background: '#fbf6ec', border: '1px solid rgba(51,50,74,0.14)', borderRadius: 12, padding: '14px 48px 14px 14px', fontSize: 15, lineHeight: 1.6, color: '#3f3b2e', resize: 'vertical', boxSizing: 'border-box' }}
+                  style={{ width: '100%', minHeight: 140, background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 12, padding: '14px 48px 14px 14px', fontSize: 15, lineHeight: 1.6, color: '#3f3b2e', resize: 'vertical', boxSizing: 'border-box' }}
                 />
                 <div
-                  onClick={startVoiceForReflection}
+                  onClick={toggleVoiceForReflection}
                   style={{
                     position: 'absolute', right: 12, top: 12, width: 32, height: 32, borderRadius: '50%',
-                    background: micListening ? '#b8935a' : '#33324a', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: micListening ? '#6B8F76' : '#3A3A38', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                     animation: micListening ? 'mic-pulse 1.4s infinite' : 'none',
                   }}
@@ -326,44 +453,56 @@ export default function CheckinPage() {
                   </svg>
                 </div>
                 {micListening && (
-                  <div style={{ position: 'absolute', right: 12, top: 50, fontSize: 11, fontWeight: 600, color: '#b8935a' }}>
-                    Listening…
+                  <div style={{ position: 'absolute', right: 12, top: 50, fontSize: 11, fontWeight: 600, color: '#6B8F76' }}>
+                    Listening… tap to stop
                   </div>
                 )}
               </div>
             )}
 
-            <button onClick={nextStep} disabled={!answers[qIndex]} style={btnStyle(answers[qIndex] ? '#33324a' : 'rgba(51,50,74,0.3)')}>
+            <button onClick={nextStep} disabled={!answers[qIndex]} style={btnStyle(answers[qIndex] ? '#3A3A38' : 'rgba(58,58,56,0.3)')}>
               Next
             </button>
+
+            <div style={{ textAlign: 'center', marginTop: 14 }}>
+              {skipCanUse ? (
+                <div onClick={handleSkip} style={{ fontSize: 12.5, fontWeight: 500, color: '#8A8880', cursor: skipping ? 'default' : 'pointer' }}>
+                  {skipping ? 'Finding a new question…' : 'Skip this question'}
+                </div>
+              ) : (
+                <div onClick={() => router.push('/paywall')} style={{ fontSize: 12.5, color: '#8A8880' }}>
+                  Out of free skips — <span style={{ fontWeight: 600, color: '#6B8F76', cursor: 'pointer' }}>get unlimited with Plus</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {phase === 'quotePrompt' && !showQuoteEntry && (
           <div style={{ textAlign: 'center', padding: '30px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div style={{ fontFamily: 'Caveat, cursive', fontSize: 14, color: '#b8935a' }}>before you go</div>
-            <div style={{ fontFamily: 'Lora, serif', fontSize: 22, fontWeight: 700, color: '#33324a' }}>Was there a line you loved?</div>
+            <div style={{ fontFamily: 'Spectral, serif', fontStyle: 'italic', fontSize: 16, color: '#6B8F76' }}>before you go</div>
+            <div style={{ fontFamily: 'Fraunces, serif', fontSize: 22, fontWeight: 500, color: '#3A3A38' }}>Was there a line you loved?</div>
             <div style={{ fontSize: 13.5, lineHeight: 1.6, color: '#5c5642', maxWidth: 260 }}>Save a phrase or sentence from what you just read.</div>
-            <button onClick={() => setShowQuoteEntry(true)} style={{ ...btnStyle('#33324a'), maxWidth: 240 }}>Save a line</button>
-            <div onClick={finish} style={{ fontSize: 13, fontWeight: 500, color: '#8d8570', cursor: 'pointer', marginTop: 2 }}>Skip</div>
+            <button onClick={() => setShowQuoteEntry(true)} style={{ ...btnStyle('#3A3A38'), maxWidth: 240 }}>Save a line</button>
+            <div onClick={finish} style={{ fontSize: 13, fontWeight: 500, color: '#8A8880', cursor: 'pointer', marginTop: 2 }}>Skip</div>
           </div>
         )}
 
         {phase === 'quotePrompt' && showQuoteEntry && (
           <div>
-            <div style={{ fontFamily: 'Lora, serif', fontSize: 18, fontWeight: 600, color: '#33324a', marginBottom: 16 }}>Save a line</div>
-            <div style={{ position: 'relative', marginBottom: 26 }}>
+            <div style={{ fontFamily: 'Fraunces, serif', fontSize: 18, fontWeight: 500, color: '#3A3A38', marginBottom: 16 }}>Save a line</div>
+            <div style={{ position: 'relative', marginBottom: 12 }}>
               <textarea
                 value={quoteText}
                 onChange={(e) => setQuoteText(e.target.value)}
                 placeholder="Type or speak the line…"
-                style={{ width: '100%', minHeight: 120, background: '#fbf6ec', border: '1px solid rgba(51,50,74,0.14)', borderRadius: 12, padding: '14px 48px 14px 14px', fontSize: 15, lineHeight: 1.6, color: '#3f3b2e', resize: 'vertical', boxSizing: 'border-box' }}
+                style={{ width: '100%', minHeight: 120, background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 12, padding: '14px 48px 14px 14px', fontSize: 15, lineHeight: 1.6, color: '#3f3b2e', resize: 'vertical', boxSizing: 'border-box' }}
               />
               <div
-                onClick={startVoiceForQuote}
+                onClick={toggleVoiceForQuote}
                 style={{
                   position: 'absolute', right: 12, top: 12, width: 32, height: 32, borderRadius: '50%',
-                  background: quoteMicListening ? '#b8935a' : '#33324a', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: quoteMicListening ? '#6B8F76' : '#3A3A38', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
                   animation: quoteMicListening ? 'mic-pulse 1.4s infinite' : 'none',
                 }}
@@ -375,12 +514,18 @@ export default function CheckinPage() {
                 </svg>
               </div>
               {quoteMicListening && (
-                <div style={{ position: 'absolute', right: 12, top: 50, fontSize: 11, fontWeight: 600, color: '#b8935a' }}>
-                  Listening…
+                <div style={{ position: 'absolute', right: 12, top: 50, fontSize: 11, fontWeight: 600, color: '#6B8F76' }}>
+                  Listening… tap to stop
                 </div>
               )}
             </div>
-            <button onClick={saveQuoteAndFinish} style={btnStyle('#33324a')}>Save entry</button>
+            <input
+              value={quotePage}
+              onChange={(e) => setQuotePage(e.target.value)}
+              placeholder="Page (optional)"
+              style={{ width: '100%', background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 10, padding: '10px 12px', fontSize: 13, color: '#3A3A38', marginBottom: 20, boxSizing: 'border-box' }}
+            />
+            <button onClick={saveQuoteAndFinish} style={btnStyle('#3A3A38')}>Save entry</button>
           </div>
         )}
 
@@ -390,7 +535,7 @@ export default function CheckinPage() {
 }
 
 function Loading() {
-  return <div style={{ minHeight: '100vh', background: '#efe6d3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</div>
+  return <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</div>
 }
 
 function btnStyle(bg: string): React.CSSProperties {
