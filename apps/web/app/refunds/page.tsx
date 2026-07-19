@@ -1,8 +1,15 @@
+'use client'
+
+import { useRouter } from 'next/navigation'
+
 export default function RefundsPage() {
-    return (
-      <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
-        <div style={{ maxWidth: 640, width: '100%', margin: '0 auto', padding: '60px 22px 80px', boxSizing: 'border-box' }}>
-          <div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, fontWeight: 500, color: '#3A3A38', marginBottom: 8 }}>Refund Policy</div>
+  const router = useRouter()
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ maxWidth: 640, width: '100%', margin: '0 auto', padding: '60px 22px 80px', boxSizing: 'border-box' }}>
+        <div onClick={() => router.back()} style={{ fontSize: 14, color: '#8A8880', cursor: 'pointer', marginBottom: 20 }}>← Back</div>
+        <div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, fontWeight: 500, color: '#3A3A38', marginBottom: 8 }}>Refund Policy</div>
           <div style={{ fontSize: 13, color: '#8A8880', marginBottom: 32 }}>Last updated: July 18, 2026</div>
   
           <Section title="1. Subscription Cancellation">

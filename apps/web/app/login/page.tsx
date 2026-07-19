@@ -78,6 +78,9 @@ export default function LoginPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', padding: '40px 24px' }}>
       <div style={{ width: '100%', maxWidth: 380 }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <img src="/images/logo-wordmark.png" alt="Afterwords" style={{ display: 'block', width: 180, maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />
+        </div>
         <div style={{ fontFamily: 'Fraunces, serif', fontSize: 26, fontWeight: 500, color: '#3A3A38', marginBottom: 6, textAlign: 'center' }}>
           {mode === 'signup' ? 'Create your account' : 'Welcome back'}
         </div>

@@ -115,9 +115,8 @@ function OnboardingContent() {
 
         {step === 0 && (
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
-            <img src="/images/logo.png" alt="Afterwords logo" style={{ width: 96, height: 96, objectFit: 'contain' }} />
-            <div style={{ fontFamily: 'Spectral, serif', fontSize: 16, color: '#6B8F76' }}>a quiet place to remember</div>
-            <div style={{ fontFamily: 'Fraunces, serif', fontSize: 46, fontWeight: 500, color: '#3A3A38' }}>Afterwords</div>
+            <img src="/images/logo-wordmark.png" alt="Afterwords" style={{ width: 220, maxWidth: '100%', objectFit: 'contain' }} />
+            <div style={{ fontFamily: 'Spectral, serif', fontStyle: 'italic', fontSize: 16, color: '#6B8F76' }}>a quiet place to remember</div>
             <video
   src="/videos/welcome-illustration.mp4"
   autoPlay
