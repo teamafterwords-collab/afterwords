@@ -9,7 +9,7 @@ export default function BottomNav() {
   const tabs = [
     { label: 'Home', path: '/home' },
     { label: 'Journal', path: '/journal' },
-    { label: 'Connections', path: '/connections' },
+    { label: 'Map', path: '/connections' },
     { label: 'Settings', path: '/settings' },
   ]
 
@@ -19,10 +19,7 @@ export default function BottomNav() {
       display: 'flex', justifyContent: 'center',
       borderTop: '1px solid rgba(58,58,56,0.08)', background: '#FAF9F6',
     }}>
-      <div style={{
-        display: 'flex', width: '100%', maxWidth: 560,
-        padding: '12px 22px 20px', boxSizing: 'border-box',
-      }}>
+      <div className="aw-container" style={{ display: 'flex', padding: '12px 22px 20px' }}>
         {tabs.map((tab) => {
           const active = pathname === tab.path
           return (

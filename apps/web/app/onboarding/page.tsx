@@ -111,7 +111,8 @@ function OnboardingContent() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', padding: '40px 24px' }}>
-      <div style={{ width: '100%', maxWidth: 380 }}>
+      <div className="aw-container">
+        <div style={{ width: '100%', maxWidth: 380, margin: '0 auto' }}>
 
         {step === 0 && (
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
@@ -184,6 +185,7 @@ function OnboardingContent() {
           </div>
         )}
 
+      </div>
       </div>
     </div>
   )

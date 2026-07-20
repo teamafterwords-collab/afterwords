@@ -28,7 +28,8 @@ export default function ResetPasswordPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#efe6d3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', padding: '40px 24px' }}>
-      <div style={{ width: '100%', maxWidth: 380 }}>
+      <div className="aw-container">
+        <div style={{ width: '100%', maxWidth: 380, margin: '0 auto' }}>
         <div style={{ fontFamily: 'Lora, serif', fontSize: 24, fontWeight: 700, color: '#33324a', marginBottom: 6, textAlign: 'center' }}>Set a new password</div>
         <div style={{ fontSize: 13, color: '#8d8570', marginBottom: 24, textAlign: 'center' }}>Choose a new password for your account.</div>
 
@@ -60,6 +61,7 @@ export default function ResetPasswordPage() {
             {saving ? 'Saving…' : 'Update password'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   )

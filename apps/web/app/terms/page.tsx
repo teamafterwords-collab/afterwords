@@ -7,7 +7,7 @@ export default function TermsPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ maxWidth: 640, width: '100%', margin: '0 auto', padding: '60px 22px 80px', boxSizing: 'border-box' }}>
+      <div className="aw-container" style={{ padding: '60px 22px 80px' }}>
         <div onClick={() => router.back()} style={{ fontSize: 14, color: '#8A8880', cursor: 'pointer', marginBottom: 20 }}>← Back</div>
         <div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, fontWeight: 500, color: '#3A3A38', marginBottom: 8 }}>Terms of Service</div>
           <div style={{ fontSize: 13, color: '#8A8880', marginBottom: 32 }}>Last updated: July 18, 2026</div>

@@ -17,7 +17,7 @@ export default function PaywallPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: '60px 22px 40px', position: 'relative' }}>
+      <div className="aw-container" style={{ width: '100%', margin: '0 auto', padding: '60px 22px 40px', position: 'relative' }}>
         <div onClick={() => router.push('/home')} style={{ position: 'absolute', top: 24, right: 22, fontSize: 20, color: '#8A8880', cursor: 'pointer' }}>✕</div>
 
         <div style={{ textAlign: 'center', fontFamily: 'Spectral, serif', fontSize: 16, color: '#6B8F76', marginBottom: 14 }}>

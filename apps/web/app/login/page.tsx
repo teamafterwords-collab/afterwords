@@ -77,7 +77,8 @@ export default function LoginPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', padding: '40px 24px' }}>
-      <div style={{ width: '100%', maxWidth: 380 }}>
+      <div className="aw-container">
+        <div style={{ width: '100%', maxWidth: 380, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <img src="/images/logo-wordmark.png" alt="Afterwords" style={{ display: 'block', width: 180, maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />
         </div>
@@ -160,6 +161,7 @@ export default function LoginPage() {
             <>Don&apos;t have an account? <span onClick={() => setMode('signup')} style={{ fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>Sign up</span></>
           )}
         </div>
+      </div>
       </div>
 
       {showForgotPassword && (

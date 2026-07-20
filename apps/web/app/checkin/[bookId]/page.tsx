@@ -8,9 +8,10 @@ import {
   generateCheckinQuestions, generateSingleQuestion, generateReplacementQuestion, generateReviewQuestions,
   getFollowUpQuestion, isReflectionShallow,
   saveCheckinEntries, updateBookProgress, incrementCheckinCount, saveQuote, cleanupTranscript,
+  generateBookSummary, type BookSummaryResult,
 } from '@/utils/supabase/queries'
 
-type Phase = 'range' | 'loading' | 'questions' | 'quotePrompt' | 'error'
+type Phase = 'range' | 'loading' | 'questions' | 'quotePrompt' | 'error' | 'justFinished'
 
 type SpeechRecognitionResultLike = { transcript: string }
 interface SpeechRecognitionLike extends EventTarget {
@@ -76,6 +77,10 @@ function CheckinContent() {
   const [micRecognition, setMicRecognition] = useState<SpeechRecognitionLike | null>(null)
   const [quoteMicListening, setQuoteMicListening] = useState(false)
   const [quoteMicRecognition, setQuoteMicRecognition] = useState<SpeechRecognitionLike | null>(null)
+
+  const [bookSummary, setBookSummary] = useState<BookSummaryResult | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [finishStats, setFinishStats] = useState<{ reflections: number; quotes: number } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -333,8 +338,11 @@ function CheckinContent() {
     const range = isReviewMode ? 'Review' : (to === from + 1 ? `${unitLabel}${to}` : `${unitLabel}${from + 1}-${to}`)
     await saveCheckinEntries(book.id, questions, answers, range)
 
+    let justFinished = false
+
     if (!isReviewMode) {
       const status = to >= (totalUnits ?? 0) ? 'finished' : 'currently_reading'
+      justFinished = status === 'finished' && book.status !== 'finished'
       const newAsked = [...(book.asked_questions || []), ...questions.map((q) => q.prompt)]
       await updateBookProgress(book.id, to, status, newAsked)
     } else {
@@ -343,6 +351,21 @@ function CheckinContent() {
     }
 
     await incrementCheckinCount()
+
+    if (justFinished) {
+      const { data: userData } = await supabase.auth.getUser()
+      const { data: allEntries } = await supabase.from('entries').select('*').eq('book_id', book.id).eq('user_id', userData.user?.id)
+      const reflections = (allEntries || []).filter((e) => e.kind === 'entry').length
+      const quotes = (allEntries || []).filter((e) => e.kind === 'quote').length
+      setFinishStats({ reflections, quotes })
+      setPhase('justFinished')
+      setSummaryLoading(true)
+      const summary = await generateBookSummary(book, allEntries || [])
+      setBookSummary(summary)
+      setSummaryLoading(false)
+      return
+    }
+
     router.push(isReviewMode ? `/journal?book=${book.id}` : '/home')
     router.refresh()
   }
@@ -360,7 +383,7 @@ function CheckinContent() {
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
       <style>{pulseKeyframes}</style>
-      <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: '60px 22px 30px', boxSizing: 'border-box' }}>
+      <div className="aw-container" style={{ width: '100%', margin: '0 auto', padding: '60px 22px 30px', boxSizing: 'border-box' }}>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: isReviewMode ? 8 : 22 }}>
           <div onClick={() => router.push('/home')} style={{ fontSize: 20, color: '#3A3A38', cursor: 'pointer' }}>←</div>
@@ -562,6 +585,43 @@ function CheckinContent() {
               style={{ width: '100%', background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 10, padding: '10px 12px', fontSize: 13, color: '#3A3A38', marginBottom: 20, boxSizing: 'border-box' }}
             />
             <button onClick={saveQuoteAndFinish} style={btnStyle('#3A3A38')}>Save entry</button>
+          </div>
+        )}
+
+        {phase === 'justFinished' && (
+          <div style={{ textAlign: 'center', padding: '20px 10px' }}>
+            <div style={{ height: 1, background: 'rgba(58,58,56,0.12)', margin: '0 auto 24px', width: 60 }} />
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6B8F76', marginBottom: 10 }}>Finished</div>
+            <div style={{ fontFamily: 'Fraunces, serif', fontSize: 26, fontWeight: 600, color: '#3A3A38', marginBottom: 20 }}>{book.title}</div>
+
+            {finishStats && (
+              <div style={{ fontSize: 13.5, color: '#5c5642', marginBottom: 24 }}>
+                You answered {finishStats.reflections} prompt{finishStats.reflections === 1 ? '' : 's'} · Saved {finishStats.quotes} quote{finishStats.quotes === 1 ? '' : 's'}
+              </div>
+            )}
+
+            <div style={{ textAlign: 'left', background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 14, padding: 18, marginBottom: 24 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#6B8F76', marginBottom: 8 }}>AI Summary</div>
+              {summaryLoading ? (
+                <div style={{ fontFamily: 'Spectral, serif', fontStyle: 'italic', fontSize: 13.5, color: '#8A8880' }}>Reflecting on your journey through this book…</div>
+              ) : bookSummary ? (
+                <div style={{ fontSize: 14, lineHeight: 1.65, color: '#4a4636' }}>{bookSummary.summary}</div>
+              ) : (
+                <div style={{ fontSize: 13.5, color: '#8A8880' }}>Not enough reflections yet to summarize.</div>
+              )}
+            </div>
+
+            <div
+              onClick={() => router.push(`/journal?book=${book.id}`)}
+              style={{ fontSize: 13.5, fontWeight: 600, color: '#3A3A38', cursor: 'pointer', marginBottom: 16 }}
+            >
+              View Book Summary →
+            </div>
+
+            <button onClick={() => { router.push('/home'); router.refresh() }} style={btnStyle('#3A3A38')}>
+              Done
+            </button>
+            <div style={{ height: 1, background: 'rgba(58,58,56,0.12)', margin: '24px auto 0', width: 60 }} />
           </div>
         )}
 

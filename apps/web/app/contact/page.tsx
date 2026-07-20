@@ -7,7 +7,7 @@ export default function ContactPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ maxWidth: 480, width: '100%', padding: '60px 22px', boxSizing: 'border-box' }}>
+      <div className="aw-container" style={{ padding: '60px 22px' }}>
         <div onClick={() => router.back()} style={{ fontSize: 14, color: '#8A8880', cursor: 'pointer', marginBottom: 20 }}>← Back</div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: 'Fraunces, serif', fontSize: 26, fontWeight: 500, color: '#3A3A38', marginBottom: 12 }}>Get in touch</div>

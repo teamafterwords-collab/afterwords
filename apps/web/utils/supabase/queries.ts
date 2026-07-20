@@ -342,10 +342,29 @@ export async function saveQuote(bookId: string, text: string, manualPage?: strin
   return { success: true }
 }
 
+export async function saveNote(bookId: string, text: string) {
+  const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+  if (!userData.user) return { error: 'Not logged in' }
+
+  const { error } = await supabase.from('entries').insert({
+    user_id: userData.user.id,
+    book_id: bookId,
+    kind: 'note',
+    text: text.trim(),
+  })
+
+  if (error) {
+    console.error('saveNote failed:', error)
+    return { error: error.message }
+  }
+  return { success: true }
+}
+
 export type Entry = {
   id: string
   book_id: string
-  kind: 'entry' | 'quote'
+  kind: 'entry' | 'quote' | 'note'
   question: string | null
   response: string | null
   text: string | null
@@ -366,6 +385,65 @@ export async function getEntriesForUser(): Promise<Entry[]> {
     return []
   }
   return data as Entry[]
+}
+
+export async function updateEntry(entryId: string, updates: { response?: string; text?: string }) {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('entries')
+    .update(updates)
+    .eq('id', entryId)
+
+  if (error) {
+    console.error('updateEntry failed:', error)
+    return { error: error.message }
+  }
+  return { success: true }
+}
+
+export type MemoryCardInsight = {
+  title: string
+  insight: string | null
+}
+
+export async function generateMemoryCardInsight(
+  book: Book,
+  quoteOrAnswerText: string,
+  sessionEntries: Entry[]
+): Promise<MemoryCardInsight> {
+  const { callAI, extractJSON } = await import('@/utils/ai')
+
+  const sessionContext = sessionEntries
+    .map((e) => (e.kind === 'quote' ? `Saved line: "${e.text}"` : `${e.question} — ${e.response}`))
+    .join('\n')
+
+  const prompt = `Someone reflected on "${book.title}" by ${book.author} and wrote or saved this:
+"${quoteOrAnswerText}"
+
+Full context from that session:
+${sessionContext}
+
+Do two things:
+
+1. Write a short title (3-6 words, lowercase, no punctuation at the end) that captures the essence of what they focused on — like a chapter heading for this memory. Example: "finding meaning without witnesses"
+
+2. Decide if there's a genuine INSIGHT worth surfacing — something that adds a new perspective on what they wrote, not just a rephrasing of it. An insight should point out a pattern, a deeper theme, or something implicit in how they're engaging with the book that they may not have stated directly. If you would just be paraphrasing or restating what they already said in different words, there is NO genuine insight — leave it out entirely rather than force one.
+
+Respond with ONLY valid JSON:
+{"title":"short title here","hasInsight":true|false,"insight":"one or two sentences, written directly to the reader, or empty string if hasInsight is false"}
+
+Write in plain text only — no markdown formatting.`
+
+  const raw = await callAI(prompt)
+  if (!raw) return { title: book.title, insight: null }
+
+  const result = extractJSON<{ title?: string; hasInsight?: boolean; insight?: string }>(raw)
+  if (!result) return { title: book.title, insight: null }
+
+  return {
+    title: result.title || book.title,
+    insight: result.hasInsight && result.insight ? result.insight : null,
+  }
 }
 
 export async function summarizeRecentCheckin(
@@ -392,14 +470,77 @@ Respond with ONLY the sentence, nothing else.`
   return raw.trim().replace(/^["']|["']$/g, '')
 }
 
-export async function findCrossBookConnection(
+export type ChapterSummary = {
+  headline: string
+  takeaway: string
+}
+
+export async function generateChapterSummary(
+  book: Book,
+  chapterLabel: string,
+  items: Entry[]
+): Promise<ChapterSummary | null> {
+  const { callAI, extractJSON } = await import('@/utils/ai')
+
+  const content = items
+    .map((e) => (e.kind === 'quote' ? `Saved line: "${e.text}"` : `${e.question} — ${e.response}`))
+    .join('\n')
+
+  if (!content.trim()) return null
+
+  const prompt = `Someone read "${chapterLabel}" of "${book.title}" by ${book.author} and left these reflections:
+${content}
+
+Write two things:
+1. A short headline (4-8 words) capturing the main idea they engaged with in this chapter — written like a chapter subtitle, not a question. Example: "Tiny habits create momentum"
+2. A one or two sentence "takeaway" written directly to the reader, summarizing what they seemed to connect with most in this chapter — grounded specifically in what they actually wrote, not generic chapter content.
+
+Respond with ONLY valid JSON: {"headline":"...","takeaway":"..."}
+Write in plain text only — no markdown formatting.`
+
+  const raw = await callAI(prompt)
+  if (!raw) return null
+  const result = extractJSON<ChapterSummary>(raw)
+  return result || null
+}
+
+export type BookSummaryResult = {
+  summary: string
+}
+
+export async function generateBookSummary(book: Book, allEntries: Entry[]): Promise<BookSummaryResult | null> {
+  const { callAI } = await import('@/utils/ai')
+
+  const reflections = allEntries.filter((e) => e.kind === 'entry' && e.question_type !== 'mc' && e.response)
+  if (!reflections.length) return null
+
+  const content = reflections
+    .slice(0, 15)
+    .map((e) => `${e.question} — ${e.response}`)
+    .join('\n')
+
+  const prompt = `Someone just finished reading "${book.title}" by ${book.author}. Here are their reflections throughout the book:
+${content}
+
+Write a short summary (2-3 sentences) of the themes and ideas they repeatedly came back to across this book — grounded specifically in what they actually wrote, written directly to the reader. This should feel like a meaningful closing note on their reading experience, not a book review.
+
+Respond with ONLY the summary text, nothing else. Plain text only, no markdown.`
+
+  const raw = await callAI(prompt)
+  if (!raw) return null
+  return { summary: raw.trim() }
+}
+
+export type BookConnection = { bookTitle: string; theme: string; category: string; note: string }
+
+export async function findCrossBookConnections(
   currentBook: Book,
   currentEntries: Entry[],
   otherBooksWithEntries: { title: string; entries: Entry[] }[]
-): Promise<{ bookTitle: string; theme: string; category: string; note: string } | null> {
+): Promise<BookConnection[]> {
   const { callAI, extractJSON } = await import('@/utils/ai')
 
-  if (!currentEntries.length || !otherBooksWithEntries.length) return null
+  if (!currentEntries.length || !otherBooksWithEntries.length) return []
 
   const summarize = (e: Entry) => (e.kind === 'quote' ? `Saved line: "${e.text}"` : `${e.question} — ${e.response}`)
 
@@ -415,37 +556,74 @@ Here are their reflections from OTHER books they have read:
 
 ${othersSummary}
 
-Is there a genuine thematic connection between what they wrote about "${currentBook.title}" and any ONE other book — a shared emotion, idea, or experience (not just a shared word)?
-If yes, respond with ONLY valid JSON: {"found":true,"bookTitle":"...","theme":"a short phrase","category":"one of: Identity & Self, Loss & Grief, Love & Connection, Fear & Courage, Meaning & Purpose, Change & Growth, Memory & Time, Other","note":"one warm sentence connecting the two, written to the reader directly"}
-If no genuine connection, respond with ONLY: {"found":false}
+Find genuine thematic connections between what they wrote about "${currentBook.title}" and their OTHER books — shared emotions, ideas, or experiences (not just shared words). There may be connections to more than one other book. Only include real, meaningful connections — do not force a match if none genuinely exists. Return at most 3 connections, one per other book maximum.
+
+Respond with ONLY valid JSON, an array (even if empty):
+[{"bookTitle":"...","theme":"a short phrase","category":"one of: Identity & Self, Loss & Grief, Love & Connection, Fear & Courage, Meaning & Purpose, Change & Growth, Memory & Time, Other","note":"one warm sentence connecting the two, written to the reader directly"}]
+
+If there are no genuine connections at all, respond with: []
 Write in plain text only — no markdown formatting.`
 
   const raw = await callAI(prompt)
-  if (!raw) return null
-  const result = extractJSON<{ found: boolean; bookTitle?: string; theme?: string; category?: string; note?: string }>(raw)
-  if (!result || !result.found) return null
-  return { bookTitle: result.bookTitle!, theme: result.theme!, category: result.category || 'Other', note: result.note! }
+  if (!raw) return []
+  const result = extractJSON<BookConnection[]>(raw)
+  if (!result || !Array.isArray(result)) return []
+  return result
 }
 
 export async function findAllConnections(
   books: Book[],
   entries: Entry[]
-): Promise<{ bookId: string; bookTitle: string; connection: { bookTitle: string; theme: string; category: string; note: string } }[]> {
+): Promise<{ bookId: string; bookTitle: string; connection: BookConnection }[]> {
+  const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+  if (!userData.user) return []
+
   const booksWithEntries = books.filter((b) => entries.some((e) => e.book_id === b.id))
   if (booksWithEntries.length < 2) return []
 
-  const results: { bookId: string; bookTitle: string; connection: { bookTitle: string; theme: string; category: string; note: string } }[] = []
+  const { data: cacheRows } = await supabase
+    .from('connections_cache')
+    .select('book_id, connections, entry_count_at_calculation')
+    .eq('user_id', userData.user.id)
+
+  const cacheByBookId = new Map(
+    (cacheRows || []).map((row) => [row.book_id as string, row])
+  )
+
+  const results: { bookId: string; bookTitle: string; connection: BookConnection }[] = []
 
   for (const book of booksWithEntries) {
     const currentEntries = entries.filter((e) => e.book_id === book.id)
-    const otherBooksWithEntries = booksWithEntries
-      .filter((b) => b.id !== book.id)
-      .map((b) => ({ title: b.title, entries: entries.filter((e) => e.book_id === b.id) }))
+    const entryCount = currentEntries.length
+    const cached = cacheByBookId.get(book.id)
 
-    const connection = await findCrossBookConnection(book, currentEntries, otherBooksWithEntries)
-    if (connection) {
-      results.push({ bookId: book.id, bookTitle: book.title, connection })
+    let connections: BookConnection[]
+    if (cached && cached.entry_count_at_calculation === entryCount) {
+      connections = cached.connections as BookConnection[]
+    } else {
+      const otherBooksWithEntries = booksWithEntries
+        .filter((b) => b.id !== book.id)
+        .map((b) => ({ title: b.title, entries: entries.filter((e) => e.book_id === b.id) }))
+
+      connections = await findCrossBookConnections(book, currentEntries, otherBooksWithEntries)
+
+      const { error } = await supabase.from('connections_cache').upsert(
+        {
+          user_id: userData.user.id,
+          book_id: book.id,
+          connections,
+          entry_count_at_calculation: entryCount,
+          calculated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,book_id' }
+      )
+      if (error) console.error('connections_cache upsert failed:', error)
     }
+
+    connections.forEach((connection) => {
+      results.push({ bookId: book.id, bookTitle: book.title, connection })
+    })
   }
 
   return results

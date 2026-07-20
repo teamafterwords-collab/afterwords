@@ -30,8 +30,8 @@ export default function BugReportButton() {
     <>
       <div
         onClick={() => setOpen(true)}
+        className="aw-bug-fab"
         style={{
-          position: 'fixed', left: 'calc(50% - 280px + 16px)', bottom: 92, zIndex: 60,
           width: 40, height: 40, borderRadius: '50%', background: '#3A3A38',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
@@ -51,7 +51,8 @@ export default function BugReportButton() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: '#FAF9F6', width: '100%', maxWidth: 560, borderRadius: '22px 22px 0 0', padding: '26px 22px 30px', boxShadow: '0 -10px 30px rgba(0,0,0,0.2)' }}
+            className="aw-container"
+            style={{ background: '#FAF9F6', borderRadius: '22px 22px 0 0', padding: '26px 22px 30px', boxShadow: '0 -10px 30px rgba(0,0,0,0.2)' }}
           >
             {!submitted ? (
               <>

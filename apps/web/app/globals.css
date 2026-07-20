@@ -8,6 +8,7 @@ html, body {
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --aw-max: 560px;
 }
 
 @theme inline {
@@ -28,4 +29,46 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.aw-container {
+  max-width: 560px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --aw-max: 720px;
+  }
+
+  .aw-container {
+    max-width: 720px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --aw-max: 880px;
+  }
+
+  .aw-container {
+    max-width: 880px;
+  }
+}
+
+.aw-fab-add {
+  position: fixed;
+  bottom: 92px;
+  left: calc((100vw + min(100vw, var(--aw-max))) / 2 - 72px);
+  z-index: 40;
+}
+
+.aw-bug-fab {
+  position: fixed;
+  bottom: 92px;
+  left: calc((100vw - min(100vw, var(--aw-max))) / 2 + 16px);
+  z-index: 60;
 }

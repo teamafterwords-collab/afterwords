@@ -7,7 +7,7 @@ export default function WelcomePage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ maxWidth: 480, width: '100%', margin: '0 auto', padding: '60px 24px 40px', boxSizing: 'border-box' }}>
+      <div className="aw-container" style={{ padding: '60px 24px 40px' }}>
 
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <img src="/images/logo-wordmark.png" alt="Afterwords" style={{ display: 'block', width: 220, maxWidth: '100%', objectFit: 'contain', margin: '0 auto' }} />

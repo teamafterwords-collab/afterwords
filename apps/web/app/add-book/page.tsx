@@ -94,7 +94,7 @@ export default function AddBookPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: '60px 22px 40px', boxSizing: 'border-box' }}>
+      <div className="aw-container" style={{ width: '100%', margin: '0 auto', padding: '60px 22px 40px', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
           <div onClick={() => router.push('/home')} style={{ fontSize: 20, color: '#3A3A38', cursor: 'pointer' }}>←</div>
           <div style={{ fontFamily: 'Fraunces, serif', fontSize: 20, fontWeight: 500, color: '#3A3A38' }}>Add a book</div>

@@ -47,7 +47,7 @@ export default function SettingsPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', padding: '60px 22px 100px' }}>
+      <div className="aw-container" style={{ width: '100%', margin: '0 auto', padding: '60px 22px 100px' }}>
         <div style={{ fontFamily: 'Fraunces, serif', fontSize: 24, fontWeight: 500, color: '#3A3A38', marginBottom: 24, marginTop: 4 }}>Settings</div>
 
         <div style={{ fontSize: 13, fontWeight: 600, color: '#3A3A38', marginBottom: 4 }}>Subscription</div>
