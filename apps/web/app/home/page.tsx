@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import {
-  getBooks, getEntriesForUser, getCheckinCount, generateMemoryCardInsight,
-  type Book, type Entry, type MemoryCardInsight,
+  getBooks, getEntriesForUser, getCheckinCount, generateMemoryCardInsight, getReadingPersonalityInsight,
+  getResurfacedEntry, getResurfacedTimeLabel,
+  type Book, type Entry, type MemoryCardInsight, type ResurfacedEntry,
 } from '@/utils/supabase/queries'
 import BottomNav from '@/components/BottomNav'
 
@@ -50,6 +51,10 @@ export default function HomePage() {
   const [memoryInsights, setMemoryInsights] = useState<Record<string, MemoryCardInsight>>({})
   const insightCache = useRef<Record<string, MemoryCardInsight>>({})
   const [detailMemory, setDetailMemory] = useState<MemoryItem | null>(null)
+  const [readingInsight, setReadingInsight] = useState<string | null>(null)
+  const [insightLoading, setInsightLoading] = useState(true)
+  const [resurfaced, setResurfaced] = useState<ResurfacedEntry | null>(null)
+  const [showFullInsight, setShowFullInsight] = useState(false)
 
   useEffect(() => {
     Promise.all([getBooks(), getEntriesForUser()]).then(([b, e]) => {
@@ -144,6 +149,21 @@ export default function HomePage() {
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, books])
+
+  useEffect(() => {
+    getReadingPersonalityInsight().then((result) => {
+      setReadingInsight(result)
+      setInsightLoading(false)
+    })
+  }, [])
+
+  useEffect(() => {
+    getResurfacedEntry().then(setResurfaced)
+  }, [])
+
+  const toTitleCase = (text: string) => {
+    return text.replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+  }
 
   const progressLabel = (b: Book) => {
     const total = b.tracking_mode === 'page' ? b.total_pages : b.total_chapters
@@ -256,17 +276,17 @@ export default function HomePage() {
                   {memories.map((m) => {
                     const info = memoryInsights[m.sessionKey]
                     const isLoadingInfo = !info || info.title === '…'
-                    const quoteShort = m.rawText ? truncateChars(m.rawText, 140) : null
-                    const insightShort = info?.insight ? truncateChars(info.insight, 280) : null
+                    const quoteShort = m.rawText ? truncateChars(m.rawText, 70) : null
+                    const insightShort = info?.insight ? truncateChars(info.insight, 100) : null
 
                     return (
                       <div
                         key={m.id}
                         onClick={() => setDetailMemory(m)}
-                        style={{ flex: '0 0 auto', width: 230, background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 14, padding: 16, cursor: 'pointer', boxSizing: 'border-box', overflow: 'hidden' }}
+                        style={{ flex: '0 0 auto', width: 200, background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 14, padding: 16, cursor: 'pointer', boxSizing: 'border-box', overflow: 'hidden' }}
                       >
                         <div style={{ fontFamily: 'Fraunces, serif', fontSize: 13.5, fontWeight: 600, color: '#3A3A38', marginBottom: 8 }}>
-                          {isLoadingInfo ? '…' : info.title}
+                          {isLoadingInfo ? '…' : toTitleCase(info.title)}
                         </div>
 
                         {quoteShort && (
@@ -287,6 +307,56 @@ export default function HomePage() {
                       </div>
                     )
                   })}
+                </div>
+              </div>
+            )}
+
+            {!insightLoading && readingInsight && (() => {
+              const short = truncateChars(readingInsight, 120)
+              return (
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#8A8880', marginBottom: 10 }}>What Your Reading Says</div>
+                  <div
+                    onClick={() => setShowFullInsight(true)}
+                    style={{ background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 16, padding: 18, cursor: 'pointer' }}
+                  >
+                    <div style={{ fontFamily: 'Spectral, serif', fontStyle: 'italic', fontSize: 15, lineHeight: 1.5, color: '#3A3A38' }}>
+                      {short.display}
+                    </div>
+                    {short.truncated && (
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#6B8F76', marginTop: 8 }}>Read more →</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {resurfaced && (
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#8A8880', marginBottom: 10 }}>
+                  From {getResurfacedTimeLabel(resurfaced.daysAgo)}
+                </div>
+                <div
+                  onClick={() => router.push(`/journal?book=${resurfaced.entry.book_id}`)}
+                  style={{ background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 16, padding: 20, cursor: 'pointer' }}
+                >
+                  {resurfaced.entry.kind === 'quote' ? (
+                    <div style={{ fontFamily: 'Spectral, serif', fontStyle: 'italic', fontSize: 17, lineHeight: 1.5, color: '#3A3A38', marginBottom: 12 }}>
+                      &quot;{resurfaced.entry.text}&quot;
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontFamily: 'Fraunces, serif', fontSize: 14, fontWeight: 600, color: '#3A3A38', marginBottom: 6 }}>
+                        {resurfaced.entry.question}
+                      </div>
+                      <div style={{ fontSize: 14.5, lineHeight: 1.55, color: '#4a4636', marginBottom: 12 }}>
+                        {resurfaced.entry.response}
+                      </div>
+                    </>
+                  )}
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.03em', textTransform: 'uppercase', color: '#6B8F76' }}>
+                    {resurfaced.book?.title ?? 'a book'}
+                  </div>
                 </div>
               </div>
             )}
@@ -344,7 +414,7 @@ export default function HomePage() {
               <div onClick={() => setDetailMemory(null)} style={{ textAlign: 'right', fontSize: 20, color: '#8A8880', cursor: 'pointer', marginBottom: 6 }}>✕</div>
 
               <div style={{ fontFamily: 'Fraunces, serif', fontSize: 19, fontWeight: 600, color: '#3A3A38', marginBottom: 16 }}>
-                {info?.title || detailMemory.bookTitle}
+                {info?.title ? toTitleCase(info.title) : detailMemory.bookTitle}
               </div>
 
               {detailMemory.rawText && (
@@ -370,6 +440,24 @@ export default function HomePage() {
           </div>
         )
       })()}
+
+      {showFullInsight && readingInsight && (
+          <div
+            onClick={() => setShowFullInsight(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(58,58,56,0.4)', zIndex: 70, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 22 }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{ background: '#FAF9F6', width: '100%', maxWidth: 460, borderRadius: 20, padding: '28px 24px', boxShadow: '0 20px 50px rgba(0,0,0,0.25)', boxSizing: 'border-box' }}
+            >
+              <div onClick={() => setShowFullInsight(false)} style={{ textAlign: 'right', fontSize: 20, color: '#8A8880', cursor: 'pointer', marginBottom: 6 }}>✕</div>
+              <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6B8F76', marginBottom: 14 }}>What Your Reading Says</div>
+              <div style={{ fontFamily: 'Spectral, serif', fontStyle: 'italic', fontSize: 18, lineHeight: 1.6, color: '#3A3A38' }}>
+                {readingInsight}
+              </div>
+            </div>
+          </div>
+        )}
 
       <BottomNav />
     </div>

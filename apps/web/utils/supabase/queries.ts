@@ -425,7 +425,7 @@ ${sessionContext}
 
 Do two things:
 
-1. Write a short title (3-6 words, lowercase, no punctuation at the end) that captures the essence of what they focused on — like a chapter heading for this memory. Example: "finding meaning without witnesses"
+1. Write a short title (3-6 words, Title Case, no punctuation at the end) that captures the essence of what they focused on — like a chapter heading for this memory. Example: "Finding Meaning Without Witnesses"
 
 2. Decide if there's a genuine INSIGHT worth surfacing — something that adds a new perspective on what they wrote, not just a rephrasing of it. An insight should point out a pattern, a deeper theme, or something implicit in how they're engaging with the book that they may not have stated directly. If you would just be paraphrasing or restating what they already said in different words, there is NO genuine insight — leave it out entirely rather than force one.
 
@@ -531,7 +531,7 @@ Respond with ONLY the summary text, nothing else. Plain text only, no markdown.`
   return { summary: raw.trim() }
 }
 
-export type BookConnection = { bookTitle: string; theme: string; category: string; note: string }
+export type BookConnection = { bookTitle: string; theme: string; category: string; note: string; evidence: string[]; strength: 'strong' | 'moderate' | 'loose'; topics: string[] }
 
 export async function findCrossBookConnections(
   currentBook: Book,
@@ -558,8 +558,17 @@ ${othersSummary}
 
 Find genuine thematic connections between what they wrote about "${currentBook.title}" and their OTHER books — shared emotions, ideas, or experiences (not just shared words). There may be connections to more than one other book. Only include real, meaningful connections — do not force a match if none genuinely exists. Return at most 3 connections, one per other book maximum.
 
+For each connection, also pick 2-3 short verbatim phrases (under 8 words each) from the actual reflections above (from EITHER book) that best support this connection — quote them exactly as written, don't paraphrase.
+
+Also rate the strength of each connection honestly:
+- "strong" — the reader explicitly drew this link themselves, or the overlap is unmistakable and central to what they wrote in both books
+- "moderate" — a real, meaningful thematic overlap, but more inferred than explicitly stated
+- "loose" — a genuine but subtle or tangential parallel
+
+Also extract 1-3 specific one-word or two-word topic tags for this connection (more specific than the category — e.g. "Identity", "Habits", "Loneliness", "Mortality", "Ambition", "Creativity", "Failure", "Leadership", "Solitude"). These should feel like searchable keywords, not sentences.
+
 Respond with ONLY valid JSON, an array (even if empty):
-[{"bookTitle":"...","theme":"a short phrase","category":"one of: Identity & Self, Loss & Grief, Love & Connection, Fear & Courage, Meaning & Purpose, Change & Growth, Memory & Time, Other","note":"one warm sentence connecting the two, written to the reader directly"}]
+[{"bookTitle":"...","theme":"a short phrase, this should be the headline, e.g. 'Meaning without guarantees'","category":"one of: Identity & Self, Loss & Grief, Love & Connection, Fear & Courage, Meaning & Purpose, Change & Growth, Memory & Time, Other","note":"one or two sentences connecting the two, written to the reader directly, starting with what's shared rather than restating book titles","evidence":["short verbatim phrase 1","short verbatim phrase 2"],"strength":"strong"|"moderate"|"loose","topics":["Topic1","Topic2"]}]
 
 If there are no genuine connections at all, respond with: []
 Write in plain text only — no markdown formatting.`
@@ -568,7 +577,7 @@ Write in plain text only — no markdown formatting.`
   if (!raw) return []
   const result = extractJSON<BookConnection[]>(raw)
   if (!result || !Array.isArray(result)) return []
-  return result
+  return result.map((r) => ({ ...r, evidence: Array.isArray(r.evidence) ? r.evidence : [], strength: r.strength || 'moderate', topics: Array.isArray(r.topics) ? r.topics : [] }))
 }
 
 export async function findAllConnections(
@@ -744,6 +753,102 @@ export async function fetchTitleSuggestions(query: string): Promise<TitleSuggest
   }
 }
 
+
+export async function getReadingPersonalityInsight(): Promise<string | null> {
+  const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+  if (!userData.user) return null
+
+  const allEntries = await getEntriesForUser()
+  const reflections = allEntries.filter((e) => e.kind === 'entry' && e.question_type !== 'mc' && e.response)
+
+  if (reflections.length < 5) return null
+
+  const { data: cached } = await supabase
+    .from('reading_insight_cache')
+    .select('*')
+    .eq('user_id', userData.user.id)
+    .single()
+
+  if (cached && cached.entry_count_at_calculation === reflections.length) {
+    return cached.insight
+  }
+
+  const books = await getBooks()
+  const { callAI } = await import('@/utils/ai')
+
+  const content = reflections
+    .slice(0, 40)
+    .map((e) => {
+      const book = books.find((b) => b.id === e.book_id)
+      return `[${book?.title ?? 'a book'}] ${e.question} — ${e.response}`
+    })
+    .join('\n')
+
+  const prompt = `Here are someone's reading reflections across multiple books, in roughly chronological order:
+${content}
+
+Look across ALL of these — not any single book — and identify a genuine pattern in how they engage with what they read. What keeps coming up across different books? What kind of reader are they becoming? Write 2-3 sentences, directly to the reader, that feels like a real insight about them — not a summary of any one book, but something only visible by looking across their whole reading history.
+
+Be specific and grounded in what they actually wrote. Avoid generic statements that could apply to anyone. If you don't see a genuine cross-book pattern yet, say so honestly rather than forcing one.
+
+Respond with ONLY the insight text (or a brief honest note that no clear pattern has emerged yet), nothing else. Plain text, no markdown.`
+
+  const raw = await callAI(prompt)
+  if (!raw) return null
+
+  const insight = raw.trim()
+
+  await supabase.from('reading_insight_cache').upsert({
+    user_id: userData.user.id,
+    insight,
+    entry_count_at_calculation: reflections.length,
+    calculated_at: new Date().toISOString(),
+  }, { onConflict: 'user_id' })
+
+  return insight
+}
+
+export type ResurfacedEntry = {
+  entry: Entry
+  book: Book | null
+  daysAgo: number
+}
+
+export async function getResurfacedEntry(): Promise<ResurfacedEntry | null> {
+  const allEntries = await getEntriesForUser()
+  const books = await getBooks()
+
+  const MIN_AGE_DAYS = 30
+  const now = Date.now()
+
+  const eligible = allEntries.filter((e) => {
+    const ageDays = (now - new Date(e.created_at).getTime()) / 86400000
+    const hasContent = e.kind === 'quote' ? !!e.text : !!e.response
+    return ageDays >= MIN_AGE_DAYS && hasContent
+  })
+
+  if (!eligible.length) return null
+
+  const dayIndex = Math.floor(now / 86400000)
+  const chosen = eligible[dayIndex % eligible.length]
+
+  const book = books.find((b) => b.id === chosen.book_id) || null
+  const daysAgo = Math.floor((now - new Date(chosen.created_at).getTime()) / 86400000)
+
+  return { entry: chosen, book, daysAgo }
+}
+
+function formatTimeAgo(days: number): string {
+  if (days < 60) return `${days} days ago`
+  if (days < 365) return `${Math.floor(days / 30)} months ago`
+  const years = Math.floor(days / 365)
+  return `${years} year${years === 1 ? '' : 's'} ago`
+}
+
+export function getResurfacedTimeLabel(days: number): string {
+  return formatTimeAgo(days)
+}
 
 export async function submitBugReport(page: string, message: string) {
   const supabase = createClient()

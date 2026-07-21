@@ -45,6 +45,7 @@ export default function WelcomePage() {
         </button>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', fontSize: 12, color: '#8A8880' }}>
+          <a href="/pricing" style={{ color: '#8A8880', textDecoration: 'none' }}>Pricing</a>
           <a href="/terms" style={{ color: '#8A8880', textDecoration: 'none' }}>Terms</a>
           <a href="/privacy" style={{ color: '#8A8880', textDecoration: 'none' }}>Privacy</a>
           <a href="/refunds" style={{ color: '#8A8880', textDecoration: 'none' }}>Refunds</a>

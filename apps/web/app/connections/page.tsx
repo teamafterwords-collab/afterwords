@@ -1,14 +1,20 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide } from 'd3-force'
 import { useRouter } from 'next/navigation'
-import { getBooks, getEntriesForUser, findAllConnections, type Book } from '@/utils/supabase/queries'
+import { getBooks, getEntriesForUser, findAllConnections, type Book, type BookConnection } from '@/utils/supabase/queries'
 import BottomNav from '@/components/BottomNav'
 import ResponsiveStyles from '@/components/ResponsiveStyles'
 
-type ConnectionResult = { bookId: string; bookTitle: string; connection: { bookTitle: string; theme: string; category: string; note: string } }
+type ConnectionResult = { bookId: string; bookTitle: string; connection: BookConnection }
 
 const CATEGORY_ORDER = ['Identity & Self', 'Loss & Grief', 'Love & Connection', 'Fear & Courage', 'Meaning & Purpose', 'Change & Growth', 'Memory & Time', 'Other']
+const STRENGTH_LABELS: Record<string, { label: string; dots: number }> = {
+  strong: { label: 'Deep Connection', dots: 3 },
+  moderate: { label: 'Related', dots: 2 },
+  loose: { label: 'Loose Parallel', dots: 1 },
+}
 const CATEGORY_COLORS: Record<string, string> = {
   'Identity & Self': '#6B8F76',
   'Loss & Grief': '#8A7A9B',
@@ -29,6 +35,8 @@ export default function ConnectionsPage() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [selectedLine, setSelectedLine] = useState<ConnectionResult | null>(null)
   const [focusedBookId, setFocusedBookId] = useState<string | null>(null)
+  const [activeTopic, setActiveTopic] = useState<string | null>(null)
+  const [simPositions, setSimPositions] = useState<Record<string, { x: number; y: number }>>({})
 
   useEffect(() => {
     async function load() {
@@ -50,8 +58,20 @@ export default function ConnectionsPage() {
   }, [])
 
   const availableCategories = CATEGORY_ORDER.filter((cat) => connections.some((c) => c.connection.category === cat))
+  const availableTopics = [...new Set(connections.flatMap((c) => c.connection.topics || []))].sort()
 
-  const categoryFiltered = activeCategory ? connections.filter((c) => c.connection.category === activeCategory) : connections
+  const totalConnections = connections.length
+  const uniqueThemes = new Set(connections.map((c) => c.connection.theme)).size
+
+  const categoryCounts: Record<string, number> = {}
+  connections.forEach((c) => {
+    categoryCounts[c.connection.category] = (categoryCounts[c.connection.category] || 0) + 1
+  })
+  const mostRecurringCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null
+
+  const categoryFiltered = connections
+    .filter((c) => !activeCategory || c.connection.category === activeCategory)
+    .filter((c) => !activeTopic || (c.connection.topics || []).includes(activeTopic))
 
   const filteredConnections = focusedBookId
     ? categoryFiltered.filter((c) => {
@@ -66,38 +86,44 @@ export default function ConnectionsPage() {
   }))]
   const nodeBooks = nodeBookIds.map((id) => books.find((b) => b.id === id)).filter(Boolean) as Book[]
 
-  const bookPrimaryCategory: Record<string, string> = {}
-  nodeBooks.forEach((book) => {
-    const bookConnections = connections.filter((c) => c.bookId === book.id || books.find((b) => b.title === c.connection.bookTitle)?.id === book.id)
-    const categoryCounts: Record<string, number> = {}
-    bookConnections.forEach((c) => { categoryCounts[c.connection.category] = (categoryCounts[c.connection.category] || 0) + 1 })
-    const topCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Other'
-    bookPrimaryCategory[book.id] = topCategory
-  })
-  const clusteredNodeBooks = [...nodeBooks].sort((a, b) => {
-    const catA = CATEGORY_ORDER.indexOf(bookPrimaryCategory[a.id])
-    const catB = CATEGORY_ORDER.indexOf(bookPrimaryCategory[b.id])
-    return catA - catB
-  })
-
   const mapSize = 280
-  const center = mapSize / 2
-  const radius = mapSize / 2 - 40
-  const nodePositions: Record<string, { x: number; y: number }> = {}
-  clusteredNodeBooks.forEach((book, i) => {
-    const angle = (i / clusteredNodeBooks.length) * 2 * Math.PI - Math.PI / 2
-    nodePositions[book.id] = {
-      x: center + radius * Math.cos(angle),
-      y: center + radius * Math.sin(angle),
-    }
-  })
+
+  useEffect(() => {
+    if (nodeBooks.length === 0) return
+
+    type SimNode = { id: string; x?: number; y?: number }
+    const nodes: SimNode[] = nodeBooks.map((b) => ({ id: b.id }))
+    const links = connections
+      .map((c) => {
+        const targetBook = books.find((b) => b.title === c.connection.bookTitle)
+        if (!targetBook) return null
+        return { source: c.bookId, target: targetBook.id }
+      })
+      .filter(Boolean) as { source: string; target: string }[]
+
+    const sim = forceSimulation(nodes as any)
+      .force('charge', forceManyBody().strength(-180))
+      .force('link', forceLink(links as any).id((d: any) => d.id).distance(90))
+      .force('center', forceCenter(mapSize / 2, (mapSize + 24) / 2))
+      .force('collide', forceCollide(30))
+      .stop()
+
+    for (let i = 0; i < 300; i++) sim.tick()
+
+    const positions: Record<string, { x: number; y: number }> = {}
+    nodes.forEach((n) => {
+      positions[n.id] = { x: n.x ?? mapSize / 2, y: n.y ?? (mapSize + 24) / 2 }
+    })
+    setSimPositions(positions)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections, books])
 
   const lines = connections
     .map((c) => {
       const targetBook = books.find((b) => b.title === c.connection.bookTitle)
       if (!targetBook) return null
-      const from = nodePositions[c.bookId]
-      const to = nodePositions[targetBook.id]
+      const from = simPositions[c.bookId]
+      const to = simPositions[targetBook.id]
       if (!from || !to) return null
       const touchesFocus = !focusedBookId || c.bookId === focusedBookId || targetBook.id === focusedBookId
       return { from, to, color: CATEGORY_COLORS[c.connection.category] || '#8A8880', connection: c, targetBookId: targetBook.id, touchesFocus }
@@ -115,8 +141,30 @@ export default function ConnectionsPage() {
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
       <ResponsiveStyles />
       <div className="aw-container" style={{ width: '100%', margin: '0 auto', padding: '60px 22px 110px', boxSizing: 'border-box' }}>
-        <div style={{ fontFamily: 'Fraunces, serif', fontSize: 24, fontWeight: 500, color: '#3A3A38', marginBottom: 6, marginTop: 4 }}>Map</div>
-        <div style={{ fontSize: 13, color: '#8A8880', marginBottom: 24 }}>How your books talk to each other.</div>
+        <div style={{ fontFamily: 'Fraunces, serif', fontSize: 24, fontWeight: 500, color: '#3A3A38', marginBottom: 4, marginTop: 4 }}>Your Reading Mind</div>
+        <div style={{ fontSize: 13, color: '#8A8880', marginBottom: 20 }}>How your books talk to each other.</div>
+
+        {!loading && connections.length > 0 && (
+          <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
+            <div style={{ flex: 1, background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 12, padding: '14px 12px', textAlign: 'center' }}>
+              <div style={{ fontFamily: 'Fraunces, serif', fontSize: 22, fontWeight: 600, color: '#3A3A38' }}>{totalConnections}</div>
+              <div style={{ fontSize: 10.5, color: '#8A8880', marginTop: 2 }}>connection{totalConnections === 1 ? '' : 's'}</div>
+            </div>
+            <div style={{ flex: 1, background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 12, padding: '14px 12px', textAlign: 'center' }}>
+              <div style={{ fontFamily: 'Fraunces, serif', fontSize: 22, fontWeight: 600, color: '#3A3A38' }}>{uniqueThemes}</div>
+              <div style={{ fontSize: 10.5, color: '#8A8880', marginTop: 2 }}>recurring theme{uniqueThemes === 1 ? '' : 's'}</div>
+            </div>
+            {mostRecurringCategory && (
+              <div style={{ flex: 1.4, background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 12, padding: '14px 12px', textAlign: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginBottom: 2 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: CATEGORY_COLORS[mostRecurringCategory] }} />
+                  <div style={{ fontFamily: 'Fraunces, serif', fontSize: 13, fontWeight: 600, color: '#3A3A38' }}>{mostRecurringCategory}</div>
+                </div>
+                <div style={{ fontSize: 10.5, color: '#8A8880' }}>most recurring</div>
+              </div>
+            )}
+          </div>
+        )}
 
         {loading && (
           <div style={{ textAlign: 'center', padding: '60px 10px' }}>
@@ -147,61 +195,45 @@ export default function ConnectionsPage() {
               </div>
             )}
 
+            <div style={{ textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#3A3A38', marginBottom: 8, minHeight: 18 }}>
+              {focusedBookId ? books.find((b) => b.id === focusedBookId)?.title : 'Tap a book to explore'}
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
               <svg
                 viewBox={`0 0 ${mapSize} ${mapSize + 24}`}
                 style={{ width: '100%', maxWidth: 480, height: 'auto' }}
               >
                 {lines.map((line, i) => {
-                  const midX = (line.from.x + line.to.x) / 2
-                  const midY = (line.from.y + line.to.y) / 2
                   const dimmed = focusedBookId && !line.touchesFocus
                   const isSelected = selectedLine === line.connection
-                  const showLabel = focusedBookId && line.touchesFocus
                   return (
-                    <g key={i}>
-                      <line
-                        x1={line.from.x} y1={line.from.y} x2={line.to.x} y2={line.to.y}
-                        stroke={line.color} strokeWidth={isSelected ? 3 : 1.5}
-                        opacity={dimmed ? 0.08 : isSelected ? 0.9 : 0.5}
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => setSelectedLine(isSelected ? null : line.connection)}
-                      />
-                      {showLabel && (
-                        <text
-                          x={midX} y={midY - 3}
-                          textAnchor="middle" fontSize="7.5" fontWeight="600" fill={line.color}
-                          fontFamily="Inter, sans-serif"
-                          style={{ cursor: 'pointer', pointerEvents: 'none' }}
-                        >
-                          {line.connection.connection.theme.length > 20 ? line.connection.connection.theme.slice(0, 18) + '…' : line.connection.connection.theme}
-                        </text>
-                      )}
-                    </g>
+                    <line
+                      key={i}
+                      x1={line.from.x} y1={line.from.y} x2={line.to.x} y2={line.to.y}
+                      stroke={line.color} strokeWidth={isSelected ? 3 : 1.5}
+                      opacity={dimmed ? 0.08 : isSelected ? 0.9 : 0.5}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setSelectedLine(isSelected ? null : line.connection)}
+                    />
                   )
                 })}
-                {clusteredNodeBooks.map((book) => {
-                  const pos = nodePositions[book.id]
-                  const labelBelow = pos.y > center
-                  const dimmed = focusedBookId && focusedBookId !== book.id && !lines.some((l) => l.touchesFocus && (l.connection.bookId === book.id || l.targetBookId === book.id))
+                {nodeBooks.map((book) => {
+                  const pos = simPositions[book.id]
+                  if (!pos) return null
+                  const isFocused = focusedBookId === book.id
+                  const dimmed = focusedBookId && !isFocused && !lines.some((l) => l.touchesFocus && (l.connection.bookId === book.id || l.targetBookId === book.id))
                   return (
                     <g key={book.id} onClick={() => toggleFocus(book.id)} style={{ cursor: 'pointer' }} opacity={dimmed ? 0.25 : 1}>
-                      <circle cx={pos.x} cy={pos.y} r={focusedBookId === book.id ? 21 : 18} fill={book.cover_color ?? '#3b3a5c'} stroke={focusedBookId === book.id ? '#6B8F76' : '#FAF9F6'} strokeWidth={focusedBookId === book.id ? 3 : 2.5} />
+                      <circle cx={pos.x} cy={pos.y} r={isFocused ? 21 : 16} fill={book.cover_color ?? '#3b3a5c'} stroke={isFocused ? '#6B8F76' : '#FAF9F6'} strokeWidth={isFocused ? 3 : 2} />
                       {book.cover_url && (
                         <clipPath id={`clip-${book.id}`}>
-                          <circle cx={pos.x} cy={pos.y} r={focusedBookId === book.id ? 21 : 18} />
+                          <circle cx={pos.x} cy={pos.y} r={isFocused ? 21 : 16} />
                         </clipPath>
                       )}
                       {book.cover_url && (
-                        <image href={book.cover_url} x={pos.x - 21} y={pos.y - 21} width={42} height={42} clipPath={`url(#clip-${book.id})`} preserveAspectRatio="xMidYMid slice" />
+                        <image href={book.cover_url} x={pos.x - (isFocused ? 21 : 16)} y={pos.y - (isFocused ? 21 : 16)} width={isFocused ? 42 : 32} height={isFocused ? 42 : 32} clipPath={`url(#clip-${book.id})`} preserveAspectRatio="xMidYMid slice" />
                       )}
-                      <text
-                        x={pos.x} y={labelBelow ? pos.y + 34 : pos.y - 26}
-                        textAnchor="middle" fontSize="9" fontWeight="600" fill="#3A3A38"
-                        fontFamily="Inter, sans-serif"
-                      >
-                        {book.title.length > 18 ? book.title.slice(0, 16) + '…' : book.title}
-                      </text>
                     </g>
                   )
                 })}
@@ -252,29 +284,99 @@ export default function ConnectionsPage() {
               </div>
             )}
 
+            {availableTopics.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 20, paddingBottom: 2 }}>
+                {availableTopics.map((topic) => (
+                  <div
+                    key={topic}
+                    onClick={() => setActiveTopic(activeTopic === topic ? null : topic)}
+                    style={{
+                      flex: '0 0 auto', padding: '6px 14px', borderRadius: 100, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
+                      background: activeTopic === topic ? '#6B8F76' : 'transparent',
+                      color: activeTopic === topic ? '#FAF9F6' : '#6B8F76',
+                      border: `1px solid ${activeTopic === topic ? '#6B8F76' : 'rgba(107,143,118,0.35)'}`,
+                    }}
+                  >
+                    #{topic}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {filteredConnections.map((c) => {
                 const book = books.find((b) => b.id === c.bookId)
+                const targetBook = books.find((b) => b.title === c.connection.bookTitle)
                 return (
                   <div
                     key={`${c.bookId}-${c.connection.bookTitle}`}
-                    onClick={() => router.push(`/journal?book=${c.bookId}`)}
-                    style={{ background: '#EFE4C8', border: '1px solid rgba(184,147,90,0.4)', borderRadius: 14, padding: 18, cursor: 'pointer' }}
+                    style={{ background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 14, padding: 18 }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{ width: 26, height: 34, borderRadius: 3, backgroundColor: book?.cover_color ?? '#3b3a5c', backgroundImage: book?.cover_url ? `url(${book.cover_url})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 }} />
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#3A3A38' }}>{c.bookTitle}</div>
-                      </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 600, color: CATEGORY_COLORS[c.connection.category] || '#8A8880', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                         <span style={{ width: 7, height: 7, borderRadius: '50%', background: CATEGORY_COLORS[c.connection.category] || '#8A8880', display: 'inline-block' }} />
                         {c.connection.category}
                       </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={STRENGTH_LABELS[c.connection.strength]?.label}>
+                        {[1, 2, 3].map((i) => (
+                          <span
+                            key={i}
+                            style={{
+                              width: 6, height: 6, borderRadius: '50%',
+                              background: i <= (STRENGTH_LABELS[c.connection.strength]?.dots ?? 2) ? '#6B8F76' : 'rgba(58,58,56,0.15)',
+                            }}
+                          />
+                        ))}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12.5, fontWeight: 400, color: '#b8935a', marginBottom: 8 }}>
-                      connects to <span style={{ fontWeight: 700 }}>{c.connection.bookTitle}</span> · {c.connection.theme}
+
+                    <div style={{ fontFamily: 'Fraunces, serif', fontSize: 18, fontWeight: 600, color: '#3A3A38', marginBottom: (c.connection.topics || []).length ? 8 : 12 }}>
+                      {c.connection.theme}
                     </div>
-                    <div style={{ fontSize: 13.5, lineHeight: 1.5, color: '#5c4a26' }}>{c.connection.note}</div>
+
+                    {(c.connection.topics || []).length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+                        {(c.connection.topics || []).map((topic) => (
+                          <div key={topic} onClick={() => setActiveTopic(activeTopic === topic ? null : topic)} style={{ fontSize: 10.5, fontWeight: 600, color: '#6B8F76', cursor: 'pointer' }}>
+                            #{topic}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                      <div onClick={() => router.push(`/journal?book=${c.bookId}`)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                        <div style={{ width: 20, height: 27, borderRadius: 3, backgroundColor: book?.cover_color ?? '#3b3a5c', backgroundImage: book?.cover_url ? `url(${book.cover_url})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 }} />
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3A3A38' }}>{c.bookTitle}</div>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#8A8880' }}>×</div>
+                      <div onClick={() => targetBook && router.push(`/journal?book=${targetBook.id}`)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: targetBook ? 'pointer' : 'default' }}>
+                        {targetBook && (
+                          <div style={{ width: 20, height: 27, borderRadius: 3, backgroundColor: targetBook.cover_color ?? '#3b3a5c', backgroundImage: targetBook.cover_url ? `url(${targetBook.cover_url})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 }} />
+                        )}
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3A3A38' }}>{c.connection.bookTitle}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: 13.5, lineHeight: 1.55, color: '#4a4636', marginBottom: c.connection.evidence.length ? 14 : 0 }}>
+                      {c.connection.note}
+                    </div>
+
+                    {c.connection.evidence.length > 0 && (
+                      <div style={{ borderTop: '1px solid rgba(58,58,56,0.08)', paddingTop: 12 }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#6B8F76', marginBottom: 6 }}>Evidence</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {c.connection.evidence.map((ev, i) => (
+                            <div key={i} style={{ fontSize: 12.5, color: '#4a4636', display: 'flex', gap: 6 }}>
+                              <span>·</span><span>{ev}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div onClick={() => router.push(`/journal?book=${c.bookId}`)} style={{ fontSize: 11.5, fontWeight: 600, color: '#6B8F76', marginTop: 8, cursor: 'pointer' }}>
+                          View memories →
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}
