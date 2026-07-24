@@ -20,7 +20,11 @@ export default function SettingsPage() {
   const [checkinCount, setCheckinCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [isSubscribed, setIsSubscribed] = useState(false)
+  const [subscription, setSubscription] = useState<{
+    status: string
+    plan: string | null
+    current_period_end: string | null
+  } | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -29,12 +33,13 @@ export default function SettingsPage() {
       setCheckinCount(count)
 
       const { data: userData } = await supabase.auth.getUser()
-      const { data: subscription } = await supabase
+      const { data: subscriptionData } = await supabase
         .from('subscriptions')
-        .select('status')
+        .select('status, plan, current_period_end')
         .eq('user_id', userData.user?.id)
         .single()
-      setIsSubscribed(subscription?.status === 'active')
+
+      setSubscription(subscriptionData)
 
       setLoading(false)
     }
@@ -53,6 +58,15 @@ export default function SettingsPage() {
     return <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</div>
   }
 
+  const renewalDate =
+    subscription?.current_period_end
+      ? new Date(subscription.current_period_end).toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : '—'
+
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
       <div className="aw-container" style={{ width: '100%', margin: '0 auto', padding: '60px 22px 100px' }}>
@@ -67,13 +81,12 @@ export default function SettingsPage() {
               </div>
               <div style={{ fontSize: 12.5, color: '#5c5642' }}>Unlimited access — thank you for testing!</div>
             </div>
-          ) : isSubscribed ? (
+          ) : subscription?.status === 'active' ? (
             <>
               <div style={{ fontSize: 14, fontWeight: 600, color: '#3A3A38', marginBottom: 4 }}>Afterwords Plus · Monthly</div>
-              <div style={{ fontSize: 12.5, color: '#8A8880', marginBottom: 14 }}>Renews on —</div>
-              <div style={{ display: 'flex', gap: 16 }}>
+              <div style={{ fontSize: 12.5, color: '#8A8880', marginBottom: 14 }}>Renews on {renewalDate}</div>
+              <div style={{ display: 'flex' }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>Manage subscription</div>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#8A8880', cursor: 'pointer' }}>Restore purchases</div>
               </div>
             </>
           ) : (
