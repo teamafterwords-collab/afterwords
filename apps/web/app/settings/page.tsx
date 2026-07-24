@@ -54,6 +54,30 @@ export default function SettingsPage() {
     router.refresh()
   }
 
+  const handleManageSubscription = async () => {
+    const { data: userData } = await supabase.auth.getUser()
+
+    if (!userData.user) return
+
+    const response = await fetch('/api/paddle/customer-portal', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        userId: userData.user.id,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (data.url) {
+      window.location.href = data.url
+    } else {
+      alert('Unable to open subscription portal.')
+    }
+  }
+
   if (loading || !profile) {
     return <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</div>
   }
@@ -86,7 +110,7 @@ export default function SettingsPage() {
               <div style={{ fontSize: 14, fontWeight: 600, color: '#3A3A38', marginBottom: 4 }}>Afterwords Plus · Monthly</div>
               <div style={{ fontSize: 12.5, color: '#8A8880', marginBottom: 14 }}>Renews on {renewalDate}</div>
               <div style={{ display: 'flex' }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>Manage subscription</div>
+                <div onClick={handleManageSubscription} style={{ fontSize: 12.5, fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>Manage subscription</div>
               </div>
             </>
           ) : (
