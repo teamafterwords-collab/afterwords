@@ -6,8 +6,8 @@ import { usePaddle } from '@/contexts/PaddleContext'
 import { createClient } from '@/utils/supabase/client'
 
 const PRICE_IDS = {
-  monthly: 'pri_01kxt0a4nfhbfcvpw9t1s19fge',
-  annual: 'pri_01kxt0bcb90zq6dyzjavbqt3rp',
+  monthly: 'pri_01kya6ex7e318crnaxnv8xw184',
+  annual: 'pri_01kya6ft02j2r5gp2s066f2dt0',
 }
 
 export default function PaywallPage() {
