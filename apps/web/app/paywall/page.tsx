@@ -2,17 +2,37 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { usePaddle } from '@/contexts/PaddleContext'
+import { createClient } from '@/utils/supabase/client'
+
+const PRICE_IDS = {
+  monthly: 'pri_01kxt0a4nfhbfcvpw9t1s19fge',
+  annual: 'pri_01kxt0bcb90zq6dyzjavbqt3rp',
+}
 
 export default function PaywallPage() {
   const router = useRouter()
+  const { paddle, isReady } = usePaddle()
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
 
   const price = billing === 'monthly' ? '$4.99/month' : '$3.99/month'
   const priceSubtext = billing === 'monthly' ? 'billed monthly' : 'billed annually at $47.88'
 
-  const handleSubscribe = () => {
-    alert('Welcome to Afterwords Plus! (placeholder — real billing comes later)')
-    router.push('/home')
+  const handleSubscribe = async () => {
+    if (!paddle || !isReady) return
+
+    const supabase = createClient()
+    const { data: userData } = await supabase.auth.getUser()
+    if (!userData.user) return
+
+    paddle.Checkout.open({
+      items: [{ priceId: PRICE_IDS[billing], quantity: 1 }],
+      customer: { email: userData.user.email! },
+      customData: { user_id: userData.user.id },
+      settings: {
+        successUrl: `${window.location.origin}/home?subscribed=true`,
+      },
+    })
   }
 
   return (

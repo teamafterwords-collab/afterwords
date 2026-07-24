@@ -20,12 +20,22 @@ export default function SettingsPage() {
   const [checkinCount, setCheckinCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [isSubscribed, setIsSubscribed] = useState(false)
 
   useEffect(() => {
     async function load() {
       const [p, count] = await Promise.all([getProfile(), getCheckinCount()])
       setProfile(p)
       setCheckinCount(count)
+
+      const { data: userData } = await supabase.auth.getUser()
+      const { data: subscription } = await supabase
+        .from('subscriptions')
+        .select('status')
+        .eq('user_id', userData.user?.id)
+        .single()
+      setIsSubscribed(subscription?.status === 'active')
+
       setLoading(false)
     }
     load()
@@ -42,8 +52,6 @@ export default function SettingsPage() {
   if (loading || !profile) {
     return <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</div>
   }
-
-  const isSubscribed = false
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>

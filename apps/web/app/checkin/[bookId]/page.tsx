@@ -94,9 +94,14 @@ function CheckinContent() {
 
       const { data: userData } = await supabase.auth.getUser()
       const { data: profile } = await supabase.from('profiles').select('reading_level, is_beta_tester').eq('id', userData.user?.id).single()
+      const { data: subscription } = await supabase
+        .from('subscriptions')
+        .select('status')
+        .eq('user_id', userData.user?.id)
+        .single()
       if (profile) {
         setLevel(profile.reading_level)
-        setIsPlus(!!profile.is_beta_tester)
+        setIsPlus(subscription?.status === 'active' || !!profile.is_beta_tester)
       }
 
       if (isReviewMode) {

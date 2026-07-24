@@ -29,7 +29,13 @@ async function goToCheckin(bookId: string, router: ReturnType<typeof useRouter>)
     .eq('id', userData.user?.id)
     .single()
 
-  if (profile?.is_beta_tester) {
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('status')
+    .eq('user_id', userData.user?.id)
+    .single()
+
+  if (subscription?.status === 'active' || profile?.is_beta_tester) {
     router.push(`/checkin/${bookId}`)
     return
   }

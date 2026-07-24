@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import BugReportButton from '@/components/BugReportButton'
+import { PaddleProvider } from '@/contexts/PaddleContext'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,8 +31,10 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;1,400&family=Spectral:ital,wght@0,400;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body>
-        {children}
-        <BugReportButton />
+        <PaddleProvider>
+          {children}
+          <BugReportButton />
+        </PaddleProvider>
       </body>
     </html>
   )
