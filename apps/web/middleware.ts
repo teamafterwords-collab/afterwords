@@ -36,6 +36,12 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
+
+  // Allow Paddle webhooks without authentication
+  if (path.startsWith('/api/paddle-webhook')) {
+    return NextResponse.next()
+  }
+
   const isPublic = PUBLIC_PATHS.includes(path)
 
   if (!user && !isPublic) {
@@ -48,6 +54,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|images|videos).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|images|videos).*)',
   ],
 }
