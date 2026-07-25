@@ -10,10 +10,10 @@ import ResponsiveStyles from '@/components/ResponsiveStyles'
 type ConnectionResult = { bookId: string; bookTitle: string; connection: BookConnection }
 
 const CATEGORY_ORDER = ['Identity & Self', 'Loss & Grief', 'Love & Connection', 'Fear & Courage', 'Meaning & Purpose', 'Change & Growth', 'Memory & Time', 'Other']
-const STRENGTH_LABELS: Record<string, { label: string; dots: number }> = {
-  strong: { label: 'Deep Connection', dots: 3 },
-  moderate: { label: 'Related', dots: 2 },
-  loose: { label: 'Loose Parallel', dots: 1 },
+const STRENGTH_LABELS: Record<string, { label: string }> = {
+  strong: { label: 'Deep Connection' },
+  moderate: { label: 'Related' },
+  loose: { label: 'Loose Parallel' },
 }
 const CATEGORY_COLORS: Record<string, string> = {
   'Identity & Self': '#6B8F76',
@@ -35,7 +35,6 @@ export default function ConnectionsPage() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [selectedLine, setSelectedLine] = useState<ConnectionResult | null>(null)
   const [focusedBookId, setFocusedBookId] = useState<string | null>(null)
-  const [activeTopic, setActiveTopic] = useState<string | null>(null)
   const [simPositions, setSimPositions] = useState<Record<string, { x: number; y: number }>>({})
 
   useEffect(() => {
@@ -58,7 +57,6 @@ export default function ConnectionsPage() {
   }, [])
 
   const availableCategories = CATEGORY_ORDER.filter((cat) => connections.some((c) => c.connection.category === cat))
-  const availableTopics = [...new Set(connections.flatMap((c) => c.connection.topics || []))].sort()
 
   const totalConnections = connections.length
   const uniqueThemes = new Set(connections.map((c) => c.connection.theme)).size
@@ -71,7 +69,6 @@ export default function ConnectionsPage() {
 
   const categoryFiltered = connections
     .filter((c) => !activeCategory || c.connection.category === activeCategory)
-    .filter((c) => !activeTopic || (c.connection.topics || []).includes(activeTopic))
 
   const filteredConnections = focusedBookId
     ? categoryFiltered.filter((c) => {
@@ -86,7 +83,7 @@ export default function ConnectionsPage() {
   }))]
   const nodeBooks = nodeBookIds.map((id) => books.find((b) => b.id === id)).filter(Boolean) as Book[]
 
-  const mapSize = 280
+  const mapSize = 220
 
   useEffect(() => {
     if (nodeBooks.length === 0) return
@@ -103,9 +100,9 @@ export default function ConnectionsPage() {
 
     const sim = forceSimulation(nodes as any)
       .force('charge', forceManyBody().strength(-180))
-      .force('link', forceLink(links as any).id((d: any) => d.id).distance(90))
+      .force('link', forceLink(links as any).id((d: any) => d.id).distance(65))
       .force('center', forceCenter(mapSize / 2, (mapSize + 24) / 2))
-      .force('collide', forceCollide(30))
+      .force('collide', forceCollide(18))
       .stop()
 
     for (let i = 0; i < 300; i++) sim.tick()
@@ -225,15 +222,12 @@ export default function ConnectionsPage() {
                   const dimmed = focusedBookId && !isFocused && !lines.some((l) => l.touchesFocus && (l.connection.bookId === book.id || l.targetBookId === book.id))
                   return (
                     <g key={book.id} onClick={() => toggleFocus(book.id)} style={{ cursor: 'pointer' }} opacity={dimmed ? 0.25 : 1}>
-                      <circle cx={pos.x} cy={pos.y} r={isFocused ? 21 : 16} fill={book.cover_color ?? '#3b3a5c'} stroke={isFocused ? '#6B8F76' : '#FAF9F6'} strokeWidth={isFocused ? 3 : 2} />
-                      {book.cover_url && (
-                        <clipPath id={`clip-${book.id}`}>
-                          <circle cx={pos.x} cy={pos.y} r={isFocused ? 21 : 16} />
-                        </clipPath>
-                      )}
-                      {book.cover_url && (
-                        <image href={book.cover_url} x={pos.x - (isFocused ? 21 : 16)} y={pos.y - (isFocused ? 21 : 16)} width={isFocused ? 42 : 32} height={isFocused ? 42 : 32} clipPath={`url(#clip-${book.id})`} preserveAspectRatio="xMidYMid slice" />
-                      )}
+                      <circle
+                        cx={pos.x} cy={pos.y} r={isFocused ? 13 : 9}
+                        fill={book.cover_color ?? '#3b3a5c'}
+                        stroke={isFocused ? '#6B8F76' : '#FAF9F6'}
+                        strokeWidth={isFocused ? 2.5 : 1.5}
+                      />
                     </g>
                   )
                 })}
@@ -284,25 +278,6 @@ export default function ConnectionsPage() {
               </div>
             )}
 
-            {availableTopics.length > 0 && (
-              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 20, paddingBottom: 2 }}>
-                {availableTopics.map((topic) => (
-                  <div
-                    key={topic}
-                    onClick={() => setActiveTopic(activeTopic === topic ? null : topic)}
-                    style={{
-                      flex: '0 0 auto', padding: '6px 14px', borderRadius: 100, fontSize: 11.5, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
-                      background: activeTopic === topic ? '#6B8F76' : 'transparent',
-                      color: activeTopic === topic ? '#FAF9F6' : '#6B8F76',
-                      border: `1px solid ${activeTopic === topic ? '#6B8F76' : 'rgba(107,143,118,0.35)'}`,
-                    }}
-                  >
-                    #{topic}
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {filteredConnections.map((c) => {
                 const book = books.find((b) => b.id === c.bookId)
@@ -317,32 +292,14 @@ export default function ConnectionsPage() {
                         <span style={{ width: 7, height: 7, borderRadius: '50%', background: CATEGORY_COLORS[c.connection.category] || '#8A8880', display: 'inline-block' }} />
                         {c.connection.category}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} title={STRENGTH_LABELS[c.connection.strength]?.label}>
-                        {[1, 2, 3].map((i) => (
-                          <span
-                            key={i}
-                            style={{
-                              width: 6, height: 6, borderRadius: '50%',
-                              background: i <= (STRENGTH_LABELS[c.connection.strength]?.dots ?? 2) ? '#6B8F76' : 'rgba(58,58,56,0.15)',
-                            }}
-                          />
-                        ))}
+                      <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase', color: '#6B8F76' }}>
+                        {STRENGTH_LABELS[c.connection.strength]?.label || 'Related'}
                       </div>
                     </div>
 
-                    <div style={{ fontFamily: 'Fraunces, serif', fontSize: 18, fontWeight: 600, color: '#3A3A38', marginBottom: (c.connection.topics || []).length ? 8 : 12 }}>
+                    <div style={{ fontFamily: 'Fraunces, serif', fontSize: 18, fontWeight: 600, color: '#3A3A38', marginBottom: 12 }}>
                       {c.connection.theme}
                     </div>
-
-                    {(c.connection.topics || []).length > 0 && (
-                      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-                        {(c.connection.topics || []).map((topic) => (
-                          <div key={topic} onClick={() => setActiveTopic(activeTopic === topic ? null : topic)} style={{ fontSize: 10.5, fontWeight: 600, color: '#6B8F76', cursor: 'pointer' }}>
-                            #{topic}
-                          </div>
-                        ))}
-                      </div>
-                    )}
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                       <div onClick={() => router.push(`/journal?book=${c.bookId}`)} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
