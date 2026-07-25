@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       .from('subscriptions')
       .select('paddle_customer_id')
       .eq('user_id', userId)
-      .single()
+      .maybeSingle()
 
     if (error || !subscription?.paddle_customer_id) {
       return NextResponse.json(

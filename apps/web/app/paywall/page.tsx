@@ -37,23 +37,23 @@ export default function PaywallPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
-      <div className="aw-container" style={{ width: '100%', margin: '0 auto', padding: '60px 22px 40px', position: 'relative' }}>
+      <div style={{ maxWidth: 440, width: '100%', margin: '0 auto', padding: '60px 22px 40px', position: 'relative', boxSizing: 'border-box' }}>
         <div onClick={() => router.push('/home')} style={{ position: 'absolute', top: 24, right: 22, fontSize: 20, color: '#8A8880', cursor: 'pointer' }}>✕</div>
 
         <div style={{ textAlign: 'center', fontFamily: 'Spectral, serif', fontSize: 16, color: '#6B8F76', marginBottom: 14 }}>
           a little further, together
         </div>
         <div style={{ textAlign: 'center', fontFamily: 'Fraunces, serif', fontSize: 28, fontWeight: 500, color: '#3A3A38', marginBottom: 28, lineHeight: 1.3 }}>
-          You&apos;ve reflected on 5 chapters — subscribe to keep the habit going
+          You&apos;ve used your free check-in this week — subscribe for unlimited reflection
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 26 }}>
+          <div style={{ fontSize: 14.5, color: '#3f3b2e', lineHeight: 1.5 }}>
+            Everything in Free, plus:
+          </div>
           {[
-            'Unlimited books on your shelf',
-            'Deeper, more personal reflection questions',
+            'Unlimited check-ins',
             'Unlimited question skips',
-            'Cross-book Memories & connections',
-            'Full journal export',
           ].map((f) => (
             <div key={f} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <div style={{ color: '#6B8F76', fontSize: 14 }}>✓</div>
@@ -95,14 +95,10 @@ export default function PaywallPage() {
 
         <button
           onClick={handleSubscribe}
-          style={{ width: '100%', background: '#3A3A38', color: '#f3ecdc', fontWeight: 600, fontSize: 15, padding: 16, borderRadius: 100, border: 'none', cursor: 'pointer', marginBottom: 18 }}
+          style={{ width: '100%', background: '#3A3A38', color: '#f3ecdc', fontWeight: 600, fontSize: 15, padding: 16, borderRadius: 100, border: 'none', cursor: 'pointer' }}
         >
           Subscribe to Afterwords Plus
         </button>
-
-        <div style={{ textAlign: 'center', fontSize: 13, color: '#8A8880', cursor: 'pointer' }}>
-          Restore purchases
-        </div>
       </div>
     </div>
   )

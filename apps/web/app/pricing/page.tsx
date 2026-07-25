@@ -15,23 +15,26 @@ export default function PricingPage() {
 
         <div style={{ background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 16, padding: 24, marginBottom: 16 }}>
           <div style={{ fontFamily: 'Fraunces, serif', fontSize: 18, fontWeight: 600, color: '#3A3A38', marginBottom: 4 }}>Free</div>
-          <div style={{ fontSize: 13, color: '#8A8880', marginBottom: 16 }}>Get started at no cost</div>
+          <div style={{ fontSize: 13, color: '#8A8880', marginBottom: 16 }}>30-day trial, then 1 check-in per week</div>
           <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 13.5, color: '#4a4636', lineHeight: 1.9 }}>
-            <li>✓ Up to 5 check-ins</li>
-            <li>✓ Basic reflection questions</li>
-            <li>✓ Journal for your current reads</li>
+            <li>✓ 30 days of unlimited check-ins</li>
+            <li>✓ 1 free check-in per week after your trial</li>
+            <li>✓ Unlimited books on your shelf</li>
+            <li>✓ Reflection questions matched to your reading level</li>
+            <li>✓ Save quotes and notes</li>
+            <li>✓ Cross-book Memories & Connections</li>
           </ul>
         </div>
 
         <div style={{ background: '#3A3A38', borderRadius: 16, padding: 24, marginBottom: 24 }}>
           <div style={{ fontFamily: 'Fraunces, serif', fontSize: 18, fontWeight: 600, color: '#FAF9F6', marginBottom: 4 }}>Afterwords Plus</div>
-          <div style={{ fontSize: 13, color: '#B8C4B8', marginBottom: 16 }}>Unlimited reflection, unlimited skips</div>
+          <div style={{ fontSize: 13, color: '#B8C4B8', marginBottom: 16 }}>Unlimited reflection, anytime</div>
+          <div style={{ fontSize: 13.5, color: '#F3F1EC', lineHeight: 1.6, marginBottom: 20 }}>
+            Everything in Free, plus:
+          </div>
           <ul style={{ margin: 0, padding: 0, listStyle: 'none', fontSize: 13.5, color: '#F3F1EC', lineHeight: 1.9, marginBottom: 20 }}>
-            <li>✓ Unlimited books on your shelf</li>
-            <li>✓ Deeper, more personal reflection questions</li>
+            <li>✓ Unlimited check-ins</li>
             <li>✓ Unlimited question skips</li>
-            <li>✓ Cross-book Memories & connections</li>
-            <li>✓ Full journal export</li>
           </ul>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
             <div style={{ fontSize: 13, color: '#B8C4B8' }}>Monthly</div>

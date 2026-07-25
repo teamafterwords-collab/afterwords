@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { getProfile, getCheckinCount, submitContactMessage, type Profile } from '@/utils/supabase/queries'
+import { getProfile, checkWeeklyLimit, submitContactMessage, type Profile, type TierLimit } from '@/utils/supabase/queries'
 import BottomNav from '@/components/BottomNav'
 
 const LEVEL_INFO: Record<string, { label: string; desc: string }> = {
@@ -17,7 +17,7 @@ export default function SettingsPage() {
   const supabase = createClient()
 
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [checkinCount, setCheckinCount] = useState(0)
+  const [tierInfo, setTierInfo] = useState<TierLimit | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [subscription, setSubscription] = useState<{
@@ -29,19 +29,21 @@ export default function SettingsPage() {
   const [contactMessage, setContactMessage] = useState('')
   const [contactSending, setContactSending] = useState(false)
   const [contactSent, setContactSent] = useState(false)
+  const [email, setEmail] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
-      const [p, count] = await Promise.all([getProfile(), getCheckinCount()])
+      const [p, tier] = await Promise.all([getProfile(), checkWeeklyLimit()])
       setProfile(p)
-      setCheckinCount(count)
+      setTierInfo(tier)
 
       const { data: userData } = await supabase.auth.getUser()
+      setEmail(userData.user?.email ?? null)
       const { data: subscriptionData } = await supabase
         .from('subscriptions')
         .select('status, plan, current_period_end')
         .eq('user_id', userData.user?.id)
-        .single()
+        .maybeSingle()
 
       setSubscription(subscriptionData)
 
@@ -99,6 +101,8 @@ export default function SettingsPage() {
     return <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</div>
   }
 
+  const isSubscribed = subscription?.status === 'active'
+
   const renewalDate =
     subscription?.current_period_end
       ? new Date(subscription.current_period_end).toLocaleDateString('en-US', {
@@ -112,7 +116,14 @@ export default function SettingsPage() {
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
       <div className="aw-container" style={{ width: '100%', margin: '0 auto', padding: '60px 22px 100px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 24, marginTop: 4 }}>
-          <div style={{ fontFamily: 'Fraunces, serif', fontSize: 24, fontWeight: 500, color: '#3A3A38' }}>Settings</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontFamily: 'Fraunces, serif', fontSize: 24, fontWeight: 500, color: '#3A3A38' }}>Settings</div>
+            {email && (
+              <div style={{ fontSize: 13, color: '#8A8880', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {email}
+              </div>
+            )}
+          </div>
           <div
             onClick={handleLogout}
             style={{
@@ -132,18 +143,39 @@ export default function SettingsPage() {
 
         <div style={{ fontSize: 13, fontWeight: 600, color: '#3A3A38', marginBottom: 4 }}>Subscription</div>
         <div style={{ background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 14, padding: 16, marginBottom: 26 }}>
-          {profile.is_beta_tester ? (
+          {tierInfo?.plan === 'beta' ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ background: '#6B8F76', color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 100, letterSpacing: '0.02em' }}>
+              <div style={{ background: '#b8935a', color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 100, letterSpacing: '0.02em' }}>
                 BETA TESTER
               </div>
               <div style={{ fontSize: 12.5, color: '#5c5642' }}>Unlimited access — thank you for testing!</div>
             </div>
-          ) : subscription?.status === 'active' ? (
+          ) : tierInfo?.onTrial ? (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{ background: '#6B8F76', color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 100, letterSpacing: '0.02em' }}>
+                  FREE TRIAL
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+                <div style={{ fontSize: 12.5, color: '#5c5642', lineHeight: 1.5, flex: 1, minWidth: 0 }}>
+                  Unlimited check-ins during your 30-day trial. After that, you&apos;ll move to 1 free check-in per week unless you upgrade.
+                </div>
+                <button
+                  onClick={() => router.push('/paywall')}
+                  style={{ flexShrink: 0, background: '#3A3A38', color: '#f3ecdc', fontWeight: 600, fontSize: 13, padding: '10px 20px', borderRadius: 100, border: 'none', cursor: 'pointer' }}
+                >
+                  Upgrade to Plus
+                </button>
+              </div>
+            </div>
+          ) : isSubscribed || tierInfo?.plan === 'plus' ? (
             <>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#3A3A38', marginBottom: 4 }}>Afterwords Plus · Monthly</div>
-              <div style={{ fontSize: 12.5, color: '#8A8880', marginBottom: 14 }}>Renews on {renewalDate}</div>
-              <div style={{ display: 'flex' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#3A3A38', marginBottom: 4 }}>Afterwords Plus</div>
+              <div style={{ fontSize: 12.5, color: '#8A8880', marginBottom: 14 }}>
+                Unlimited check-ins{renewalDate !== '—' ? ` · Renews on ${renewalDate}` : ''}
+              </div>
+              <div style={{ display: 'flex', gap: 16 }}>
                 <div onClick={handleManageSubscription} style={{ fontSize: 12.5, fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>Manage subscription</div>
               </div>
             </>
@@ -152,7 +184,7 @@ export default function SettingsPage() {
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#3A3A38', marginBottom: 4 }}>Free plan</div>
                 <div style={{ fontSize: 12.5, color: '#8A8880' }}>
-                  {Math.min(checkinCount, 5)} of 5 check-ins used — unlock more with Plus
+                  {tierInfo?.used ?? 0} of 1 check-in used this week
                 </div>
               </div>
               <button

@@ -7,7 +7,7 @@ import {
   type Book, type Question,
   generateCheckinQuestions, generateSingleQuestion, generateReplacementQuestion, generateReviewQuestions,
   getFollowUpQuestion, isReflectionShallow,
-  saveCheckinEntries, updateBookProgress, incrementCheckinCount, saveQuote, cleanupTranscript,
+  saveCheckinEntries, updateBookProgress, incrementCheckinCount, incrementWeeklyCheckin, saveQuote, cleanupTranscript,
   generateBookSummary, type BookSummaryResult,
 } from '@/utils/supabase/queries'
 
@@ -98,7 +98,7 @@ function CheckinContent() {
         .from('subscriptions')
         .select('status')
         .eq('user_id', userData.user?.id)
-        .single()
+        .maybeSingle()
       if (profile) {
         setLevel(profile.reading_level)
         setIsPlus(subscription?.status === 'active' || !!profile.is_beta_tester)
@@ -356,6 +356,7 @@ function CheckinContent() {
     }
 
     await incrementCheckinCount()
+    await incrementWeeklyCheckin()
 
     if (justFinished) {
       const { data: userData } = await supabase.auth.getUser()

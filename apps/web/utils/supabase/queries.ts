@@ -643,6 +643,7 @@ export type Profile = {
   reading_level: string
   onboarded: boolean
   is_beta_tester: boolean
+  trial_ends_at?: string | null
 }
 
 export async function getProfile(): Promise<Profile | null> {
@@ -692,6 +693,126 @@ export async function getCheckinCount(): Promise<number> {
     .single()
 
   return data?.total_checkins ?? 0
+}
+
+function getWeekStart(date = new Date()): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const day = d.getUTCDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  d.setUTCDate(d.getUTCDate() + mondayOffset)
+  return d.toISOString().slice(0, 10)
+}
+
+export type TierLimit = {
+  plan: 'beta' | 'plus' | 'free'
+  used: number
+  limit: number | null
+  onTrial: boolean
+  allowed: boolean
+}
+
+export async function startTrialIfNew() {
+  const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+  if (!userData.user) return
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('trial_ends_at')
+    .eq('id', userData.user.id)
+    .single()
+  if (profile?.trial_ends_at) return // already started
+
+  const trialEnd = new Date()
+  trialEnd.setDate(trialEnd.getDate() + 30)
+  await supabase
+    .from('profiles')
+    .update({ trial_ends_at: trialEnd.toISOString() })
+    .eq('id', userData.user.id)
+}
+
+export async function checkWeeklyLimit(): Promise<TierLimit> {
+  const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+  if (!userData.user) {
+    return { plan: 'free', used: 0, limit: 1, onTrial: false, allowed: false }
+  }
+
+  await startTrialIfNew()
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_beta_tester, trial_ends_at')
+    .eq('id', userData.user.id)
+    .single()
+
+  if (profile?.is_beta_tester) {
+    return { plan: 'beta', used: 0, limit: null, onTrial: false, allowed: true }
+  }
+
+  const { data: subscription } = await supabase
+    .from('subscriptions')
+    .select('status')
+    .eq('user_id', userData.user.id)
+    .maybeSingle()
+
+  if (subscription?.status === 'active') {
+    return { plan: 'plus', used: 0, limit: null, onTrial: false, allowed: true }
+  }
+
+  const onTrial = profile?.trial_ends_at
+    ? new Date(profile.trial_ends_at) > new Date()
+    : false
+
+  if (onTrial) {
+    return { plan: 'free', used: 0, limit: null, onTrial: true, allowed: true }
+  }
+
+  const weekStart = getWeekStart()
+  const { data: weekly } = await supabase
+    .from('weekly_checkins')
+    .select('count')
+    .eq('user_id', userData.user.id)
+    .eq('week_start', weekStart)
+    .maybeSingle()
+
+  const used = weekly?.count ?? 0
+  const limit = 1
+  return {
+    plan: 'free',
+    used,
+    limit,
+    onTrial: false,
+    allowed: used < limit,
+  }
+}
+
+export async function incrementWeeklyCheckin() {
+  const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+  if (!userData.user) {
+    console.error('incrementWeeklyCheckin: no user found')
+    return
+  }
+
+  const weekStart = getWeekStart()
+  console.log('incrementWeeklyCheckin: weekStart =', weekStart, 'user =', userData.user.id)
+
+  const { data: existing } = await supabase
+    .from('weekly_checkins')
+    .select('count')
+    .eq('user_id', userData.user.id)
+    .eq('week_start', weekStart)
+    .single()
+
+  const { error } = await supabase.from('weekly_checkins').upsert({
+    user_id: userData.user.id,
+    week_start: weekStart,
+    count: (existing?.count || 0) + 1,
+  }, { onConflict: 'user_id,week_start' })
+
+  if (error) console.error('incrementWeeklyCheckin upsert failed:', error)
+  else console.log('incrementWeeklyCheckin: success')
 }
 
 export type TitleSuggestion = {

@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client'
 import {
-  getBooks, getEntriesForUser, getCheckinCount, generateMemoryCardInsight, getReadingPersonalityInsight,
+  getBooks, getEntriesForUser, checkWeeklyLimit, generateMemoryCardInsight, getReadingPersonalityInsight,
   getResurfacedEntry, getResurfacedTimeLabel,
   type Book, type Entry, type MemoryCardInsight, type ResurfacedEntry,
 } from '@/utils/supabase/queries'
@@ -21,27 +20,8 @@ type MemoryItem = {
 }
 
 async function goToCheckin(bookId: string, router: ReturnType<typeof useRouter>) {
-  const supabase = createClient()
-  const { data: userData } = await supabase.auth.getUser()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_beta_tester')
-    .eq('id', userData.user?.id)
-    .single()
-
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('status')
-    .eq('user_id', userData.user?.id)
-    .single()
-
-  if (subscription?.status === 'active' || profile?.is_beta_tester) {
-    router.push(`/checkin/${bookId}`)
-    return
-  }
-
-  const count = await getCheckinCount()
-  if (count >= 5) {
+  const tier = await checkWeeklyLimit()
+  if (!tier.allowed) {
     router.push('/paywall')
     return
   }
