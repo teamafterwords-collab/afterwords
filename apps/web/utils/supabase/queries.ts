@@ -850,6 +850,24 @@ export function getResurfacedTimeLabel(days: number): string {
   return formatTimeAgo(days)
 }
 
+export async function submitContactMessage(message: string) {
+  const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+  if (!userData.user) return { error: 'Not logged in' }
+
+  const { error } = await supabase.from('contact_messages').insert({
+    user_id: userData.user.id,
+    email: userData.user.email,
+    message: message.trim(),
+  })
+
+  if (error) {
+    console.error('submitContactMessage failed:', error)
+    return { error: error.message }
+  }
+  return { success: true }
+}
+
 export async function submitBugReport(page: string, message: string) {
   const supabase = createClient()
   const { data: userData } = await supabase.auth.getUser()

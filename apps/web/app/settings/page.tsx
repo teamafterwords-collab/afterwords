@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { getProfile, getCheckinCount, type Profile } from '@/utils/supabase/queries'
+import { getProfile, getCheckinCount, submitContactMessage, type Profile } from '@/utils/supabase/queries'
 import BottomNav from '@/components/BottomNav'
 
 const LEVEL_INFO: Record<string, { label: string; desc: string }> = {
@@ -25,6 +25,10 @@ export default function SettingsPage() {
     plan: string | null
     current_period_end: string | null
   } | null>(null)
+  const [contactOpen, setContactOpen] = useState(false)
+  const [contactMessage, setContactMessage] = useState('')
+  const [contactSending, setContactSending] = useState(false)
+  const [contactSent, setContactSent] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -78,6 +82,19 @@ export default function SettingsPage() {
     }
   }
 
+  const handleContactSubmit = async () => {
+    if (!contactMessage.trim()) return
+    setContactSending(true)
+    await submitContactMessage(contactMessage)
+    setContactSending(false)
+    setContactSent(true)
+    setTimeout(() => {
+      setContactOpen(false)
+      setContactSent(false)
+      setContactMessage('')
+    }, 1500)
+  }
+
   if (loading || !profile) {
     return <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</div>
   }
@@ -94,7 +111,24 @@ export default function SettingsPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
       <div className="aw-container" style={{ width: '100%', margin: '0 auto', padding: '60px 22px 100px' }}>
-        <div style={{ fontFamily: 'Fraunces, serif', fontSize: 24, fontWeight: 500, color: '#3A3A38', marginBottom: 24, marginTop: 4 }}>Settings</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 24, marginTop: 4 }}>
+          <div style={{ fontFamily: 'Fraunces, serif', fontSize: 24, fontWeight: 500, color: '#3A3A38' }}>Settings</div>
+          <div
+            onClick={handleLogout}
+            style={{
+              background: '#B85C4A',
+              color: '#FAF9F6',
+              fontSize: 13,
+              fontWeight: 600,
+              padding: '8px 16px',
+              borderRadius: 100,
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            Log out
+          </div>
+        </div>
 
         <div style={{ fontSize: 13, fontWeight: 600, color: '#3A3A38', marginBottom: 4 }}>Subscription</div>
         <div style={{ background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 14, padding: 16, marginBottom: 26 }}>
@@ -160,16 +194,60 @@ export default function SettingsPage() {
 
         <div
           onClick={() => router.push('/onboarding?retake=true')}
-          style={{ textAlign: 'center', border: '1.5px solid rgba(51,50,74,0.2)', borderRadius: 100, padding: 13, fontSize: 13.5, fontWeight: 600, color: '#3A3A38', cursor: 'pointer', marginBottom: 12 }}
+          style={{ display: 'inline-block', textAlign: 'center', border: '1.5px solid rgba(51,50,74,0.2)', borderRadius: 100, padding: '13px 28px', fontSize: 13.5, fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}
         >
           Retake the self-assessment
         </div>
 
-        <div
-          onClick={handleLogout}
-          style={{ textAlign: 'center', border: '1.5px solid rgba(51,50,74,0.2)', borderRadius: 100, padding: 13, fontSize: 13.5, fontWeight: 600, color: '#3A3A38', cursor: 'pointer', marginBottom: 24 }}
-        >
-          Log out
+        <div style={{ height: 1, background: 'rgba(58,58,56,0.1)', margin: '28px 0' }} />
+
+        <div style={{ marginBottom: 40 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#3A3A38', marginBottom: 4 }}>Contact us</div>
+
+          {!contactOpen ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div style={{ fontSize: 12, lineHeight: 1.4, color: '#8A8880', flex: 1, minWidth: 0 }}>
+                Questions, feedback, or something not working? We&apos;d love to hear from you.
+              </div>
+              <div
+                onClick={() => setContactOpen(true)}
+                style={{ display: 'inline-block', textAlign: 'center', border: '1.5px solid rgba(58,58,56,0.2)', borderRadius: 100, padding: '13px 28px', fontSize: 13.5, fontWeight: 600, color: '#3A3A38', cursor: 'pointer', flexShrink: 0 }}
+              >
+                Send a message
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 12, lineHeight: 1.4, color: '#8A8880', marginBottom: 12 }}>
+                Questions, feedback, or something not working? We&apos;d love to hear from you.
+              </div>
+              <div style={{ background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 14, padding: 16 }}>
+                {!contactSent ? (
+                  <>
+                    <textarea
+                      value={contactMessage}
+                      onChange={(e) => setContactMessage(e.target.value)}
+                      placeholder="What's on your mind?"
+                      autoFocus
+                      style={{ width: '100%', minHeight: 100, background: '#FAF9F6', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 10, padding: 12, fontSize: 14, lineHeight: 1.5, color: '#3A3A38', resize: 'vertical', marginBottom: 12, boxSizing: 'border-box' }}
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div onClick={() => { setContactOpen(false); setContactMessage('') }} style={{ flex: 1, textAlign: 'center', border: '1.5px solid rgba(58,58,56,0.2)', borderRadius: 100, padding: 10, fontSize: 13, fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>
+                        Cancel
+                      </div>
+                      <div onClick={handleContactSubmit} style={{ flex: 1, textAlign: 'center', background: '#3A3A38', color: '#FAF9F6', fontWeight: 600, fontSize: 13, padding: 10, borderRadius: 100, cursor: 'pointer' }}>
+                        {contactSending ? 'Sending…' : 'Send'}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#3A3A38' }}>Thanks — we&apos;ll get back to you 🙏</div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         <div style={{ textAlign: 'center', fontSize: 12, color: '#8A8880' }}>Afterwords · your reading companion</div>

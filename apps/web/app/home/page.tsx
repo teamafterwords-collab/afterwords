@@ -289,7 +289,7 @@ export default function HomePage() {
                       <div
                         key={m.id}
                         onClick={() => setDetailMemory(m)}
-                        style={{ flex: '0 0 auto', width: 200, background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 14, padding: 16, cursor: 'pointer', boxSizing: 'border-box', overflow: 'hidden' }}
+                        style={{ flex: '0 0 calc(50% - 6px)', background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 14, padding: 16, cursor: 'pointer', boxSizing: 'border-box', overflow: 'hidden' }}
                       >
                         <div style={{ fontFamily: 'Fraunces, serif', fontSize: 13.5, fontWeight: 600, color: '#3A3A38', marginBottom: 8 }}>
                           {isLoadingInfo ? '…' : toTitleCase(info.title)}
