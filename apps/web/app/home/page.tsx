@@ -128,7 +128,7 @@ export default function HomePage() {
       if (!m.book || !m.rawText) return
       if (memoryInsights[m.sessionKey] || insightCache.current[m.sessionKey]) return
       insightCache.current[m.sessionKey] = { title: '…', insight: null }
-      generateMemoryCardInsight(m.book, m.rawText, m.sessionEntries).then((result) => {
+      generateMemoryCardInsight(m.book, m.rawText, m.sessionEntries, m.sessionKey).then((result) => {
         insightCache.current[m.sessionKey] = result
         setMemoryInsights((prev) => ({ ...prev, [m.sessionKey]: result }))
       })

@@ -389,6 +389,8 @@ export async function getEntriesForUser(): Promise<Entry[]> {
 
 export async function updateEntry(entryId: string, updates: { response?: string; text?: string }) {
   const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+
   const { error } = await supabase
     .from('entries')
     .update(updates)
@@ -398,6 +400,24 @@ export async function updateEntry(entryId: string, updates: { response?: string;
     console.error('updateEntry failed:', error)
     return { error: error.message }
   }
+
+  // Invalidate any Memory card cache entries that include this entry, since the
+  // underlying content changed and the cached title/insight may no longer be accurate.
+  if (userData.user) {
+    const { data: cachedRows } = await supabase
+      .from('memory_card_cache')
+      .select('id, session_key')
+      .eq('user_id', userData.user.id)
+
+    const staleRowIds = (cachedRows || [])
+      .filter((row) => row.session_key.split('-').includes(entryId))
+      .map((row) => row.id)
+
+    if (staleRowIds.length > 0) {
+      await supabase.from('memory_card_cache').delete().in('id', staleRowIds)
+    }
+  }
+
   return { success: true }
 }
 
@@ -409,8 +429,25 @@ export type MemoryCardInsight = {
 export async function generateMemoryCardInsight(
   book: Book,
   quoteOrAnswerText: string,
-  sessionEntries: Entry[]
+  sessionEntries: Entry[],
+  sessionKey: string
 ): Promise<MemoryCardInsight> {
+  const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+
+  if (userData.user) {
+    const { data: cached } = await supabase
+      .from('memory_card_cache')
+      .select('title, insight')
+      .eq('user_id', userData.user.id)
+      .eq('session_key', sessionKey)
+      .maybeSingle()
+
+    if (cached) {
+      return { title: cached.title, insight: cached.insight }
+    }
+  }
+
   const { callAI, extractJSON } = await import('@/utils/ai')
 
   const sessionContext = sessionEntries
@@ -440,10 +477,21 @@ Write in plain text only — no markdown formatting.`
   const result = extractJSON<{ title?: string; hasInsight?: boolean; insight?: string }>(raw)
   if (!result) return { title: book.title, insight: null }
 
-  return {
+  const final = {
     title: result.title || book.title,
     insight: result.hasInsight && result.insight ? result.insight : null,
   }
+
+  if (userData.user) {
+    await supabase.from('memory_card_cache').upsert({
+      user_id: userData.user.id,
+      session_key: sessionKey,
+      title: final.title,
+      insight: final.insight,
+    }, { onConflict: 'user_id,session_key' })
+  }
+
+  return final
 }
 
 export async function summarizeRecentCheckin(
