@@ -416,6 +416,20 @@ export async function updateEntry(entryId: string, updates: { response?: string;
     if (staleRowIds.length > 0) {
       await supabase.from('memory_card_cache').delete().in('id', staleRowIds)
     }
+
+    // Invalidate any chapter summary cache entries that include this entry
+    const { data: chapterCacheRows } = await supabase
+      .from('chapter_summary_cache')
+      .select('id, entry_ids')
+      .eq('user_id', userData.user.id)
+
+    const staleChapterIds = (chapterCacheRows || [])
+      .filter((row) => row.entry_ids.split('-').includes(entryId))
+      .map((row) => row.id)
+
+    if (staleChapterIds.length > 0) {
+      await supabase.from('chapter_summary_cache').delete().in('id', staleChapterIds)
+    }
   }
 
   return { success: true }
@@ -528,6 +542,25 @@ export async function generateChapterSummary(
   chapterLabel: string,
   items: Entry[]
 ): Promise<ChapterSummary | null> {
+  const supabase = createClient()
+  const { data: userData } = await supabase.auth.getUser()
+
+  const entryIds = items.map((e) => e.id).sort().join('-')
+
+  if (userData.user) {
+    const { data: cached } = await supabase
+      .from('chapter_summary_cache')
+      .select('headline, takeaway, entry_ids')
+      .eq('user_id', userData.user.id)
+      .eq('book_id', book.id)
+      .eq('chapter_label', chapterLabel)
+      .maybeSingle()
+
+    if (cached && cached.entry_ids === entryIds) {
+      return { headline: cached.headline, takeaway: cached.takeaway }
+    }
+  }
+
   const { callAI, extractJSON } = await import('@/utils/ai')
 
   const content = items
@@ -549,7 +582,20 @@ Write in plain text only — no markdown formatting.`
   const raw = await callAI(prompt)
   if (!raw) return null
   const result = extractJSON<ChapterSummary>(raw)
-  return result || null
+  if (!result) return null
+
+  if (userData.user) {
+    await supabase.from('chapter_summary_cache').upsert({
+      user_id: userData.user.id,
+      book_id: book.id,
+      chapter_label: chapterLabel,
+      headline: result.headline,
+      takeaway: result.takeaway,
+      entry_ids: entryIds,
+    }, { onConflict: 'user_id,book_id,chapter_label' })
+  }
+
+  return result
 }
 
 export type BookSummaryResult = {
