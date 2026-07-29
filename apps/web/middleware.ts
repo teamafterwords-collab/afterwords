@@ -50,6 +50,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
+  // Logged-in users shouldn't see the welcome/login screens — send them straight in
+  if (user && (path === '/' || path === '/login')) {
+    const redirectUrl = new URL('/home', request.url)
+    return NextResponse.redirect(redirectUrl)
+  }
+
   return response
 }
 

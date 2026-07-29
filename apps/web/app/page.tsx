@@ -490,10 +490,14 @@ export default function WelcomePage() {
         <FadeInSection>
         <button
           onClick={() => router.push('/login')}
-          style={{ display: 'block', width: 'auto', maxWidth: '100%', margin: '0 auto 24px', background: '#6B8F76', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: '15px 36px', borderRadius: 100, border: 'none', cursor: 'pointer' }}
+          style={{ display: 'block', width: 'auto', maxWidth: '100%', margin: '0 auto 16px', background: '#6B8F76', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: '15px 36px', borderRadius: 100, border: 'none', cursor: 'pointer' }}
         >
           Start remembering what you read
         </button>
+
+        <div style={{ textAlign: 'center', fontSize: 13, color: '#8A8880', marginBottom: 24 }}>
+          Already have an account? <span onClick={() => router.push('/login')} style={{ fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>Log in</span>
+        </div>
 
         <div style={{ height: 1, background: 'rgba(58,58,56,0.15)', margin: '8px 0 24px', width: '100%' }} />
         <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', fontSize: 12, color: '#8A8880' }}>

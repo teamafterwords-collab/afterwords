@@ -81,6 +81,8 @@ function CheckinContent() {
   const [bookSummary, setBookSummary] = useState<BookSummaryResult | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [finishStats, setFinishStats] = useState<{ reflections: number; quotes: number } | null>(null)
+  const [hasFinished, setHasFinished] = useState(false)
+  const [isProcessingNext, setIsProcessingNext] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -257,89 +259,97 @@ function CheckinContent() {
   }
 
   const nextStep = async () => {
-    if (!answers[qIndex]) return
-    const currentQ = questions[qIndex]
-    const isLastPlanned = qIndex === questions.length - 1
+    if (!answers[qIndex] || isProcessingNext) return
+    setIsProcessingNext(true)
+    try {
+      const currentQ = questions[qIndex]
+      const isLastPlanned = qIndex === questions.length - 1
 
-    const wrongSoFar = answered.filter((a) => a && a.correct === false).length
-    const shouldAskMoreCasual = level === 'beginner' && isLastPlanned && wrongSoFar > 0 && questions.length < 5
+      const wrongSoFar = answered.filter((a) => a && a.correct === false).length
+      const shouldAskMoreCasual = level === 'beginner' && isLastPlanned && wrongSoFar > 0 && questions.length < 5
 
-    if (shouldAskMoreCasual) {
-      setPhase('loading')
-      const priorQuestions = [...(book.asked_questions || []), ...questions.map((q) => q.prompt)].slice(-10)
-      const extra = await generateCheckinQuestions(book, level, from, to, priorQuestions)
-      if (extra && extra.length) {
-        setQuestions([...questions, extra[0]])
-        setAnswers([...answers, ''])
-        setAnswered([...answered, null])
-        setQIndex(qIndex + 1)
-        setPhase('questions')
-      } else {
-        await finish()
-      }
-      return
-    }
-
-    if (level === 'intermediate' && currentQ.type === 'mc' && isLastPlanned) {
-      const mcCount = questions.filter((q) => q.type === 'mc').length
-      const wasCorrect = answered[qIndex]?.correct
-      const priorQuestions = [...(book.asked_questions || []), ...questions.map((q) => q.prompt)].slice(-10)
-
-      if (!wasCorrect && mcCount < 3) {
+      if (shouldAskMoreCasual) {
         setPhase('loading')
-        const nextMc = await generateSingleQuestion(book, from, to, priorQuestions, 'mc')
-        if (nextMc) {
-          setQuestions([...questions, nextMc])
+        const priorQuestions = [...(book.asked_questions || []), ...questions.map((q) => q.prompt)].slice(-10)
+        const extra = await generateCheckinQuestions(book, level, from, to, priorQuestions)
+        if (extra && extra.length) {
+          setQuestions([...questions, extra[0]])
           setAnswers([...answers, ''])
           setAnswered([...answered, null])
           setQIndex(qIndex + 1)
           setPhase('questions')
-          return
+        } else {
+          await finish()
         }
-      }
-
-      setPhase('loading')
-      const reflectQ = await generateSingleQuestion(book, from, to, priorQuestions, 'reflect')
-      if (reflectQ) {
-        setQuestions([...questions, reflectQ])
-        setAnswers([...answers, ''])
-        setAnswered([...answered, null])
-        setQIndex(qIndex + 1)
-        setPhase('questions')
         return
       }
-      await finish()
-      return
-    }
 
-    const shouldFollowUp = (level === 'intermediate' || level === 'advanced') && isLastPlanned && currentQ.type === 'reflect' && followUps < 1
+      if (level === 'intermediate' && currentQ.type === 'mc' && isLastPlanned) {
+        const mcCount = questions.filter((q) => q.type === 'mc').length
+        const wasCorrect = answered[qIndex]?.correct
+        const priorQuestions = [...(book.asked_questions || []), ...questions.map((q) => q.prompt)].slice(-10)
 
-    if (shouldFollowUp) {
-      const shallow = await isReflectionShallow(answers[qIndex])
-      if (shallow) {
+        if (!wasCorrect && mcCount < 3) {
+          setPhase('loading')
+          const nextMc = await generateSingleQuestion(book, from, to, priorQuestions, 'mc')
+          if (nextMc) {
+            setQuestions([...questions, nextMc])
+            setAnswers([...answers, ''])
+            setAnswered([...answered, null])
+            setQIndex(qIndex + 1)
+            setPhase('questions')
+            return
+          }
+        }
+
         setPhase('loading')
-        const followUpQ = await getFollowUpQuestion(book, currentQ.prompt, answers[qIndex])
-        if (followUpQ) {
-          setQuestions([...questions, followUpQ])
+        const reflectQ = await generateSingleQuestion(book, from, to, priorQuestions, 'reflect')
+        if (reflectQ) {
+          setQuestions([...questions, reflectQ])
           setAnswers([...answers, ''])
           setAnswered([...answered, null])
           setQIndex(qIndex + 1)
-          setFollowUps(followUps + 1)
           setPhase('questions')
           return
         }
-        setPhase('questions')
+        await finish()
+        return
       }
-    }
 
-    if (qIndex < questions.length - 1) {
-      setQIndex(qIndex + 1)
-    } else {
-      setPhase('quotePrompt')
+      const shouldFollowUp = (level === 'intermediate' || level === 'advanced') && isLastPlanned && currentQ.type === 'reflect' && followUps < 1
+
+      if (shouldFollowUp) {
+        const shallow = await isReflectionShallow(answers[qIndex])
+        if (shallow) {
+          setPhase('loading')
+          const followUpQ = await getFollowUpQuestion(book, currentQ.prompt, answers[qIndex])
+          if (followUpQ) {
+            setQuestions([...questions, followUpQ])
+            setAnswers([...answers, ''])
+            setAnswered([...answered, null])
+            setQIndex(qIndex + 1)
+            setFollowUps(followUps + 1)
+            setPhase('questions')
+            return
+          }
+          setPhase('questions')
+        }
+      }
+
+      if (qIndex < questions.length - 1) {
+        setQIndex(qIndex + 1)
+      } else {
+        setPhase('quotePrompt')
+      }
+    } finally {
+      setIsProcessingNext(false)
     }
   }
 
   const finish = async () => {
+    if (hasFinished) return
+    setHasFinished(true)
+
     const range = isReviewMode ? 'Review' : (to === from + 1 ? `${unitLabel}${to}` : `${unitLabel}${from + 1}-${to}`)
     await saveCheckinEntries(book.id, questions, answers, range)
 
