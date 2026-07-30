@@ -53,7 +53,7 @@ export default function AddBookPage() {
       setSuggestions(results)
       setShowSuggestions(results.length > 0)
       setSuggestLoading(false)
-    }, 300)
+    }, 200)
   }
 
   const pickSuggestion = (s: TitleSuggestion) => {
@@ -128,6 +128,11 @@ export default function AddBookPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
       <div style={{ maxWidth: 480, width: '100%', margin: '0 auto', padding: '60px 22px 40px', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
           <div onClick={() => router.push('/home')} style={{ fontSize: 20, color: '#3A3A38', cursor: 'pointer' }}>←</div>
@@ -146,7 +151,19 @@ export default function AddBookPage() {
               />
               <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: '#8A8880' }}>🔍</div>
               {suggestLoading && (
-                <div style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#8A8880' }}>…</div>
+                <div style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)' }}>
+                  <div style={{
+                    width: 16, height: 16, borderRadius: '50%',
+                    border: '2px solid rgba(58,58,56,0.15)', borderTopColor: '#6B8F76',
+                    animation: 'spin 0.6s linear infinite',
+                  }} />
+                </div>
+              )}
+
+              {suggestLoading && !showSuggestions && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 10, padding: '14px', textAlign: 'center', zIndex: 30 }}>
+                  <div style={{ fontFamily: 'Spectral, serif', fontStyle: 'italic', fontSize: 13, color: '#6B8F76' }}>Searching for your book…</div>
+                </div>
               )}
 
               {showSuggestions && (
