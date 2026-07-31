@@ -1101,11 +1101,21 @@ export async function submitBugReport(page: string, message: string) {
   return { success: true }
 }
 
-// in utils/supabase/queries.ts
 export async function updateBookStatus(bookId: string, status: Book['status']) {
   const supabase = createClient()
   const { error } = await supabase.from('books').update({ status }).eq('id', bookId)
   if (error) throw error
+}
+
+export async function updateBookTotal(bookId: string, newTotal: number, mode: 'chapter' | 'page') {
+  const supabase = createClient()
+  const field = mode === 'page' ? 'total_pages' : 'total_chapters'
+  const { error } = await supabase.from('books').update({ [field]: newTotal }).eq('id', bookId)
+  if (error) {
+    console.error('updateBookTotal failed:', error)
+    return { error: error.message }
+  }
+  return { success: true }
 }
 
 export async function removeBook(bookId: string) {

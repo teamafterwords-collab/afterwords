@@ -21,6 +21,7 @@ export default function AddBookPage() {
   const suggestCache = useRef<Record<string, TitleSuggestion[]>>({})
 
   const [selectedBook, setSelectedBook] = useState<TitleSuggestion | null>(null)
+  const [quickAddPages, setQuickAddPages] = useState('')
   const [status, setStatus] = useState<Status>('currently_reading')
 
   const [title, setTitle] = useState('')
@@ -37,6 +38,7 @@ export default function AddBookPage() {
     setSuggestions([])
     setShowSuggestions(false)
     setSelectedBook(null)
+    setQuickAddPages('')
 
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (val.trim().length < 3) return
@@ -62,15 +64,18 @@ export default function AddBookPage() {
     setSearchQuery(s.title)
     setSuggestions([])
     setShowSuggestions(false)
+    setQuickAddPages(s.totalPages && s.totalPages > 10 ? String(s.totalPages) : '')
   }
 
+  const isQuickAddValid = parseInt(quickAddPages, 10) > 0
+
   const handleQuickAdd = async () => {
-    if (!selectedBook) return
+    if (!selectedBook || !isQuickAddValid) return
     setSaving(true)
     setError(null)
 
     const finalCoverColor = COVER_COLORS[Math.floor(Math.random() * COVER_COLORS.length)]
-    const totalNum = selectedBook.totalPages || 1
+    const totalNum = parseInt(quickAddPages, 10)
 
     const result = await addBook({
       title: selectedBook.title,
@@ -199,7 +204,19 @@ export default function AddBookPage() {
                     <div style={{ fontFamily: 'Fraunces, serif', fontSize: 15, fontWeight: 600, color: '#3A3A38' }}>{selectedBook.title}</div>
                     <div style={{ fontSize: 12.5, color: '#8A8880', marginTop: 2 }}>{selectedBook.author}</div>
                     {selectedBook.genre && <div style={{ fontSize: 11, color: '#6B8F76', marginTop: 3 }}>{selectedBook.genre}</div>}
-                    {selectedBook.totalPages ? <div style={{ fontSize: 11, color: '#8A8880', marginTop: 2 }}>{selectedBook.totalPages} pages</div> : null}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                      <input
+                        type="number"
+                        value={quickAddPages}
+                        onChange={(e) => setQuickAddPages(e.target.value)}
+                        placeholder="Total pages"
+                        style={{ width: 80, background: '#FAF9F6', border: '1px solid rgba(58,58,56,0.12)', borderRadius: 6, padding: '4px 8px', fontSize: 12, color: '#3A3A38' }}
+                      />
+                      <span style={{ fontSize: 11, color: '#8A8880' }}>pages</span>
+                    </div>
+                    {(!selectedBook.totalPages || selectedBook.totalPages <= 10) && (
+                      <div style={{ fontSize: 10.5, color: '#a06a3a', marginTop: 4 }}>We couldn&apos;t confirm the page count — please check it</div>
+                    )}
                   </div>
                 </div>
 
@@ -229,8 +246,8 @@ export default function AddBookPage() {
 
                 <button
                   onClick={handleQuickAdd}
-                  disabled={saving}
-                  style={{ width: '100%', textAlign: 'center', background: '#3A3A38', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: 15, borderRadius: 100, border: 'none', cursor: 'pointer', opacity: saving ? 0.6 : 1 }}
+                  disabled={saving || !isQuickAddValid}
+                  style={{ width: '100%', textAlign: 'center', background: isQuickAddValid ? '#3A3A38' : 'rgba(58,58,56,0.3)', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: 15, borderRadius: 100, border: 'none', cursor: isQuickAddValid ? 'pointer' : 'default', opacity: saving ? 0.6 : 1 }}
                 >
                   {saving ? 'Adding…' : 'Add Book'}
                 </button>

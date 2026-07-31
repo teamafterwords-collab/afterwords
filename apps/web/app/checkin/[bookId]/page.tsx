@@ -7,7 +7,7 @@ import {
   type Book, type Question,
   generateCheckinQuestions, generateSingleQuestion, generateReplacementQuestion, generateReviewQuestions,
   getFollowUpQuestion, isReflectionShallow,
-  saveCheckinEntries, updateBookProgress, incrementCheckinCount, incrementWeeklyCheckin, saveQuote, cleanupTranscript,
+  saveCheckinEntries, updateBookProgress, updateBookTotal, incrementCheckinCount, incrementWeeklyCheckin, saveQuote, cleanupTranscript,
   generateBookSummary, type BookSummaryResult,
 } from '@/utils/supabase/queries'
 
@@ -83,6 +83,8 @@ function CheckinContent() {
   const [finishStats, setFinishStats] = useState<{ reflections: number; quotes: number } | null>(null)
   const [hasFinished, setHasFinished] = useState(false)
   const [isProcessingNext, setIsProcessingNext] = useState(false)
+  const [editingTotal, setEditingTotal] = useState(false)
+  const [totalInput, setTotalInput] = useState(1)
 
   useEffect(() => {
     async function load() {
@@ -131,6 +133,13 @@ function CheckinContent() {
   const unitLabel = isPageMode ? 'p.' : 'Ch '
   const unitWord = isPageMode ? 'page' : 'chapter'
   const totalUnits = isPageMode ? book.total_pages : book.total_chapters
+
+  const saveTotal = async () => {
+    if (totalInput < to) return // don't let it go below current progress
+    await updateBookTotal(book.id, totalInput, book.tracking_mode)
+    setBook({ ...book, [isPageMode ? 'total_pages' : 'total_chapters']: totalInput })
+    setEditingTotal(false)
+  }
 
   const confirmRange = async () => {
     setPhase('loading')
@@ -436,8 +445,29 @@ function CheckinContent() {
                   boxSizing: 'border-box',
                 }}
               />
-              <div style={{ fontSize: 14, color: '#8A8880' }}>/ {totalUnits}</div>
+              <div style={{ fontSize: 14, color: '#8A8880', display: 'flex', alignItems: 'center', gap: 6 }}>
+                / {totalUnits}
+                <span onClick={() => { setTotalInput(totalUnits ?? 1); setEditingTotal(true) }} style={{ fontSize: 12, color: '#6B8F76', fontWeight: 600, cursor: 'pointer' }}>
+                  edit
+                </span>
+              </div>
             </div>
+
+            {editingTotal && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                <input
+                  type="number"
+                  value={totalInput}
+                  onChange={(e) => setTotalInput(parseInt(e.target.value, 10) || 0)}
+                  style={{
+                    width: 80, textAlign: 'center', background: '#FAF9F6', color: '#3A3A38',
+                    border: '1px solid rgba(58,58,56,0.08)', borderRadius: 8, padding: '8px', fontSize: 14,
+                  }}
+                />
+                <div onClick={saveTotal} style={{ fontSize: 13, fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>Save</div>
+                <div onClick={() => setEditingTotal(false)} style={{ fontSize: 13, color: '#8A8880', cursor: 'pointer' }}>Cancel</div>
+              </div>
+            )}
 
             <input
               type="range" min={from} max={totalUnits ?? from + 1} value={to}
