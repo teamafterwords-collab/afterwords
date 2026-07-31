@@ -10,7 +10,7 @@ export type Book = {
   total_chapters: number | null
   total_pages: number | null
   current_chapter: number
-  status: 'want_to_read' | 'currently_reading' | 'finished'
+  status: 'want_to_read' | 'currently_reading' | 'finished' | 'didnt_finish'
   cover_color: string | null
   cover_url: string | null
   asked_questions: string[]
@@ -53,7 +53,7 @@ export async function addBook(book: {
   tracking_mode: 'chapter' | 'page'
   total_chapters: number | null
   total_pages: number | null
-  status: 'want_to_read' | 'currently_reading' | 'finished'
+  status: 'want_to_read' | 'currently_reading' | 'finished' | 'didnt_finish'
   cover_color: string
   cover_url: string
 }) {
@@ -1099,4 +1099,17 @@ export async function submitBugReport(page: string, message: string) {
     return { error: error.message }
   }
   return { success: true }
+}
+
+// in utils/supabase/queries.ts
+export async function updateBookStatus(bookId: string, status: Book['status']) {
+  const supabase = createClient()
+  const { error } = await supabase.from('books').update({ status }).eq('id', bookId)
+  if (error) throw error
+}
+
+export async function removeBook(bookId: string) {
+  const supabase = createClient()
+  const { error } = await supabase.from('books').delete().eq('id', bookId)
+  if (error) throw error
 }

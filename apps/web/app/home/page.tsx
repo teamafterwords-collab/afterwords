@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   getBooks, getEntriesForUser, checkWeeklyLimit, generateMemoryCardInsight, getReadingPersonalityInsight,
-  getResurfacedEntry, getResurfacedTimeLabel,
+  getResurfacedEntry, getResurfacedTimeLabel, updateBookStatus, removeBook,
   type Book, type Entry, type MemoryCardInsight, type ResurfacedEntry,
 } from '@/utils/supabase/queries'
 import BottomNav from '@/components/BottomNav'
@@ -54,6 +54,7 @@ export default function HomePage() {
   const currentlyReading = filteredBooks.filter((b) => b.status === 'currently_reading')
   const wantToRead = filteredBooks.filter((b) => b.status === 'want_to_read')
   const finished = filteredBooks.filter((b) => b.status === 'finished')
+  const didntFinish = filteredBooks.filter((b) => b.status === 'didnt_finish')
   const isEmpty = books.length === 0
 
   const genres = [...new Set(books.map((b) => b.genre).filter(Boolean))] as string[]
@@ -147,6 +148,28 @@ export default function HomePage() {
     getResurfacedEntry().then(setResurfaced)
   }, [])
 
+  const handleRemoveWantToRead = async (bookId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const prev = books
+    setBooks((b) => b.filter((x) => x.id !== bookId))
+    try {
+      await removeBook(bookId)
+    } catch (err) {
+      setBooks(prev) // revert on failure
+    }
+  }
+
+  const handleRemoveCurrentlyReading = async (bookId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const prev = books
+    setBooks((b) => b.map((x) => (x.id === bookId ? { ...x, status: 'didnt_finish' } : x)))
+    try {
+      await updateBookStatus(bookId, 'didnt_finish')
+    } catch (err) {
+      setBooks(prev)
+    }
+  }
+
   const toTitleCase = (text: string) => {
     return text.replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
   }
@@ -203,10 +226,16 @@ export default function HomePage() {
                   className="aw-hero"
                   onClick={() => goToCheckin(heroBook.id, router)}
                   style={{
-                    display: 'flex', gap: 16, alignItems: 'center', background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)',
+                    position: 'relative', display: 'flex', gap: 16, alignItems: 'center', background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)',
                     borderRadius: 18, padding: 18, cursor: 'pointer',
                   }}
                 >
+                  <div
+                    onClick={(e) => handleRemoveCurrentlyReading(heroBook.id, e)}
+                    style={{ position: 'absolute', top: 10, right: 10, width: 24, height: 24, borderRadius: '50%', background: 'rgba(58,58,56,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#8A8880', cursor: 'pointer' }}
+                  >
+                    ✕
+                  </div>
                   <div
                     className="aw-hero-cover"
                     style={{
@@ -238,7 +267,13 @@ export default function HomePage() {
                 <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#8A8880', marginBottom: 10 }}>Also Reading</div>
                 <div className="aw-shelf-grid" style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 4 }}>
                   {otherCurrentlyReading.map((book) => (
-                    <div key={book.id} onClick={() => goToCheckin(book.id, router)} style={{ flex: '0 0 auto', width: 100, cursor: 'pointer' }}>
+                    <div key={book.id} onClick={() => goToCheckin(book.id, router)} style={{ flex: '0 0 auto', width: 100, cursor: 'pointer', position: 'relative' }}>
+                      <div
+                        onClick={(e) => handleRemoveCurrentlyReading(book.id, e)}
+                        style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', cursor: 'pointer', zIndex: 1 }}
+                      >
+                        ✕
+                      </div>
                       <div
                         style={{
                           width: 100, height: 136, borderRadius: 8,
@@ -366,8 +401,15 @@ export default function HomePage() {
               </div>
             )}
 
-            {wantToRead.length > 0 && <Shelf title="Want to Read" books={wantToRead} progressLabel={progressLabel} progressPct={progressPct} router={router} muted />}
-            {finished.length > 0 && <Shelf title="Finished" books={finished} progressLabel={progressLabel} progressPct={progressPct} router={router} muted />}
+            {wantToRead.length > 0 && (
+              <Shelf title="Want to Read" books={wantToRead} progressLabel={progressLabel} progressPct={progressPct} router={router} muted onRemove={handleRemoveWantToRead} />
+            )}
+            {didntFinish.length > 0 && (
+              <Shelf title="Didn't Finish" books={didntFinish} progressLabel={progressLabel} progressPct={progressPct} router={router} muted />
+            )}
+            {finished.length > 0 && (
+              <Shelf title="Finished" books={finished} progressLabel={progressLabel} progressPct={progressPct} router={router} muted />
+            )}
           </>
         )}
 
@@ -451,7 +493,7 @@ export default function HomePage() {
 }
 
 function Shelf({
-  title, books, progressLabel, progressPct, router, muted,
+  title, books, progressLabel, progressPct, router, muted, onRemove,
 }: {
   title: string
   books: Book[]
@@ -459,6 +501,7 @@ function Shelf({
   progressPct: (b: Book) => number
   router: ReturnType<typeof useRouter>
   muted?: boolean
+  onRemove?: (bookId: string, e: React.MouseEvent) => void
 }) {
   return (
     <div style={{ marginBottom: 26, opacity: muted ? 0.85 : 1 }}>
@@ -467,7 +510,15 @@ function Shelf({
       </div>
       <div className="aw-shelf-grid" style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 4 }}>
         {books.map((book) => (
-          <div key={book.id} style={{ flex: '0 0 auto', width: 100 }}>
+          <div key={book.id} style={{ flex: '0 0 auto', width: 100, position: 'relative' }}>
+            {onRemove && (
+              <div
+                onClick={(e) => onRemove(book.id, e)}
+                style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', cursor: 'pointer', zIndex: 1 }}
+              >
+                ✕
+              </div>
+            )}
             <div
               onClick={() => (book.status === 'finished' ? router.push(`/journal?book=${book.id}`) : goToCheckin(book.id, router))}
               style={{
