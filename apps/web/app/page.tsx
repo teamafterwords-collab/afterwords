@@ -89,7 +89,7 @@ function ReflectDivider() {
 
 export default function WelcomePage() {
   const router = useRouter()
-  const [expandedStep, setExpandedStep] = useState<FlowStep | null>(null)
+  const [expandedStep, setExpandedStep] = useState<FlowStep | null>('realize')
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
@@ -105,8 +105,17 @@ export default function WelcomePage() {
             <div style={{ fontSize: 14, lineHeight: 1.6, color: '#5c5642', maxWidth: 340, margin: '0 auto 14px' }}>
               Capture the thoughts, questions, and moments that stay with you long after you close the book.
             </div>
-            <div style={{ fontFamily: 'Spectral, serif', fontStyle: 'italic', fontSize: 14.5, lineHeight: 1.5, color: '#6B8F76', maxWidth: 320, margin: '0 auto' }}>
+            <div style={{ fontFamily: 'Spectral, serif', fontStyle: 'italic', fontSize: 14.5, lineHeight: 1.5, color: '#6B8F76', maxWidth: 320, margin: '0 auto 24px' }}>
               Your highlights fade. Your thinking doesn&apos;t have to.
+            </div>
+            <button
+              onClick={() => router.push('/login')}
+              style={{ width: '100%', maxWidth: 360, background: '#6B8F76', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: '15px', borderRadius: 100, border: 'none', cursor: 'pointer', marginBottom: 8 }}
+            >
+              Start Free, no credit card required
+            </button>
+            <div style={{ textAlign: 'center', fontSize: 12, color: '#8A8880' }}>
+              Free for 30 days. After that, 1 free reflection a week — upgrade anytime for unlimited.
             </div>
           </div>
         </FadeInSection>
@@ -490,16 +499,21 @@ export default function WelcomePage() {
         <FadeInSection>
         <button
           onClick={() => router.push('/login')}
-          style={{ display: 'block', width: 'auto', maxWidth: '100%', margin: '0 auto 16px', background: '#6B8F76', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: '15px 36px', borderRadius: 100, border: 'none', cursor: 'pointer' }}
+          style={{ display: 'block', width: 'auto', maxWidth: '100%', margin: '0 auto 8px', background: '#6B8F76', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: '15px 36px', borderRadius: 100, border: 'none', cursor: 'pointer' }}
         >
           Start remembering what you read
         </button>
+
+        <div style={{ textAlign: 'center', fontSize: 12, color: '#8A8880', marginBottom: 16 }}>
+          Free for 30 days. After that, 1 free reflection a week — upgrade anytime for unlimited.
+        </div>
+
+        <div style={{ height: 1, background: 'rgba(58,58,56,0.15)', margin: '0 0 24px', width: '100%' }} />
 
         <div style={{ textAlign: 'center', fontSize: 13, color: '#8A8880', marginBottom: 24 }}>
           Already have an account? <span onClick={() => router.push('/login')} style={{ fontWeight: 600, color: '#3A3A38', cursor: 'pointer' }}>Log in</span>
         </div>
 
-        <div style={{ height: 1, background: 'rgba(58,58,56,0.15)', margin: '8px 0 24px', width: '100%' }} />
         <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap', fontSize: 12, color: '#8A8880' }}>
           <a href="/pricing" style={{ color: '#8A8880', textDecoration: 'none' }}>Pricing</a>
           <a href="/terms" style={{ color: '#8A8880', textDecoration: 'none' }}>Terms</a>

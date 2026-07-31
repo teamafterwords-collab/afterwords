@@ -46,6 +46,13 @@ export default function PricingPage() {
           </div>
         </div>
 
+        <button
+          onClick={() => router.push('/login')}
+          style={{ width: '100%', background: '#6B8F76', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: '15px', borderRadius: 100, border: 'none', cursor: 'pointer', marginBottom: 24 }}
+        >
+          Start Free, no credit card required
+        </button>
+
         <div style={{ fontSize: 11.5, color: '#8A8880', lineHeight: 1.6, textAlign: 'center' }}>
           Taxes may apply and will be calculated at checkout. Prices shown in USD. You can cancel your subscription anytime.
         </div>
