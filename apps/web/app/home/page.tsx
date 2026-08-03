@@ -252,7 +252,7 @@ export default function HomePage() {
                     <div style={{ height: 4, background: 'rgba(58,58,56,0.1)', borderRadius: 2, marginBottom: 6, overflow: 'hidden' }}>
                       <div style={{ height: '100%', background: '#6B8F76', width: `${progressPct(heroBook)}%` }} />
                     </div>
-                    <div style={{ fontSize: 11.5, color: '#8A8880', marginBottom: 12 }}>{progressLabel(heroBook)}</div>
+                    <div style={{ fontSize: 11.5, color: '#8A8880', marginBottom: 12 }}>{progressPct(heroBook)}% complete</div>
                     <div style={{ display: 'inline-block', background: '#3A3A38', color: '#FAF9F6', fontWeight: 600, fontSize: 13, padding: '9px 18px', borderRadius: 100 }}>
                       Continue →
                     </div>
@@ -284,6 +284,10 @@ export default function HomePage() {
                         }}
                       />
                       <div style={{ fontSize: 11.5, fontWeight: 600, color: '#3A3A38', marginTop: 6, lineHeight: 1.3 }}>{book.title}</div>
+                      <div style={{ height: 3, background: 'rgba(58,58,56,0.1)', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: '#6B8F76', width: `${progressPct(book)}%` }} />
+                      </div>
+                      <div style={{ fontSize: 10, color: '#8A8880', marginTop: 3 }}>{progressPct(book)}% complete</div>
                     </div>
                   ))}
                 </div>
@@ -530,6 +534,14 @@ function Shelf({
               }}
             />
             <div style={{ fontSize: 11.5, fontWeight: 600, color: '#3A3A38', marginTop: 6, lineHeight: 1.3 }}>{book.title}</div>
+            {book.status === 'currently_reading' && (
+              <>
+                <div style={{ height: 3, background: 'rgba(58,58,56,0.1)', borderRadius: 2, marginTop: 5, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', background: '#6B8F76', width: `${progressPct(book)}%` }} />
+                </div>
+                <div style={{ fontSize: 10, color: '#8A8880', marginTop: 3 }}>{progressPct(book)}% complete</div>
+              </>
+            )}
           </div>
         ))}
       </div>

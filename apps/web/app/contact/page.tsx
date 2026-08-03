@@ -6,9 +6,10 @@ export default function ContactPage() {
   const router = useRouter()
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="aw-container" style={{ padding: '60px 22px' }}>
-        <div onClick={() => router.back()} style={{ fontSize: 14, color: '#8A8880', cursor: 'pointer', marginBottom: 20 }}>← Back</div>
+    <div style={{ minHeight: '100vh', background: '#FAF9F6', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ maxWidth: 480, width: '100%', margin: '0 auto', padding: '60px 22px 60px', boxSizing: 'border-box' }}>
+        <div onClick={() => router.back()} style={{ fontSize: 14, color: '#8A8880', cursor: 'pointer', marginBottom: 40 }}>← Back</div>
+
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: 'Fraunces, serif', fontSize: 26, fontWeight: 500, color: '#3A3A38', marginBottom: 12 }}>Get in touch</div>
           <div style={{ fontSize: 14, lineHeight: 1.7, color: '#4a4636', marginBottom: 20 }}>

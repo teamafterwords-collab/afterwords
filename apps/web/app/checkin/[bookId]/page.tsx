@@ -59,6 +59,10 @@ function CheckinContent() {
 
   const [from, setFrom] = useState(0)
   const [to, setTo] = useState(1)
+  // Raw text the user is typing into the "to" field. Kept separate from `to`
+  // so we don't clamp/correct the value on every keystroke (that was causing
+  // the field to snap to the max value while typing multi-digit numbers).
+  const [toInput, setToInput] = useState('1')
   const [questions, setQuestions] = useState<Question[]>([])
   const [answers, setAnswers] = useState<string[]>([])
   const [answered, setAnswered] = useState<({ picked: number; correct: boolean } | null)[]>([])
@@ -94,7 +98,9 @@ function CheckinContent() {
       const totalUnits = b.tracking_mode === 'page' ? b.total_pages : b.total_chapters
       const f = b.current_chapter
       setFrom(f)
-      setTo(Math.min(totalUnits ?? f + 1, f + 1))
+      const initialTo = Math.min(totalUnits ?? f + 1, f + 1)
+      setTo(initialTo)
+      setToInput(String(initialTo))
 
       const { data: userData } = await supabase.auth.getUser()
       const { data: profile } = await supabase.from('profiles').select('reading_level, is_beta_tester').eq('id', userData.user?.id).single()
@@ -141,12 +147,29 @@ function CheckinContent() {
     setEditingTotal(false)
   }
 
+  // Parses/clamps whatever is currently in the "to" text field and commits it
+  // to the real `to` state. Called on blur and right before confirming, so
+  // partially-typed numbers are never force-corrected mid-keystroke.
+  const commitToInput = (): number => {
+    const val = parseInt(toInput, 10)
+    if (isNaN(val)) {
+      setTo(from)
+      setToInput(String(from))
+      return from
+    }
+    const clamped = Math.max(from, Math.min(totalUnits ?? val, val))
+    setTo(clamped)
+    setToInput(String(clamped))
+    return clamped
+  }
+
   const confirmRange = async () => {
+    const committedTo = commitToInput()
     setPhase('loading')
     const priorQuestions = (book.asked_questions || []).slice(-10)
 
     if (level === 'intermediate') {
-      const q = await generateSingleQuestion(book, from, to, priorQuestions, 'mc')
+      const q = await generateSingleQuestion(book, from, committedTo, priorQuestions, 'mc')
       if (!q) {
         setPhase('error')
         return
@@ -159,7 +182,7 @@ function CheckinContent() {
       return
     }
 
-    const qs = await generateCheckinQuestions(book, level, from, to, priorQuestions)
+    const qs = await generateCheckinQuestions(book, level, from, committedTo, priorQuestions)
     if (!qs) {
       setPhase('error')
       return
@@ -425,20 +448,22 @@ function CheckinContent() {
               You were on {unitLabel}{from} of {totalUnits}. Where did you read to?
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 30 }}>
               <div style={{ fontFamily: 'Fraunces, serif', fontSize: 28, fontWeight: 500, color: '#3A3A38' }}>{unitLabel}</div>
               <input
                 type="number"
                 inputMode="numeric"
-                value={to}
+                value={toInput}
                 min={from}
                 max={totalUnits ?? from + 1}
                 onChange={(e) => {
-                  const val = parseInt(e.target.value, 10)
-                  if (isNaN(val)) { setTo(from); return }
-                  const clamped = Math.max(from, Math.min(totalUnits ?? val, val))
-                  setTo(clamped)
+                  // Just track the raw text while typing — no clamping here.
+                  // Clamping mid-keystroke was causing the field to snap to
+                  // the max value before the user finished typing.
+                  setToInput(e.target.value)
                 }}
+                onBlur={commitToInput}
+                autoFocus
                 style={{
                   width: 110, textAlign: 'center', fontFamily: 'Fraunces, serif', fontSize: 34, fontWeight: 500, color: '#3A3A38',
                   background: '#F3F1EC', border: '1px solid rgba(58,58,56,0.08)', borderRadius: 12, padding: '10px 8px',
@@ -469,14 +494,8 @@ function CheckinContent() {
               </div>
             )}
 
-            <input
-              type="range" min={from} max={totalUnits ?? from + 1} value={to}
-              onChange={(e) => setTo(parseInt(e.target.value, 10))}
-              style={{ width: '100%', marginBottom: 30 }}
-            />
-
             <button onClick={confirmRange} style={btnStyle('#3A3A38')}>
-              I&apos;ve read to {unitWord} {to}
+              I&apos;ve read to {unitWord} {toInput || to}
             </button>
           </div>
         )}
