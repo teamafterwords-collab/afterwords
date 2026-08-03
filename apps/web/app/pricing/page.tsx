@@ -41,13 +41,13 @@ export default function PricingPage() {
             <div style={{ fontFamily: 'Fraunces, serif', fontSize: 20, fontWeight: 600, color: '#FAF9F6' }}>$4.99<span style={{ fontSize: 12, fontWeight: 400, color: '#B8C4B8' }}> / month</span></div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <div style={{ fontSize: 13, color: '#B8C4B8' }}>Annual <span style={{ color: '#6B8F76' }}>(save 33%)</span></div>
+            <div style={{ fontSize: 13, color: '#B8C4B8' }}>Annual <span style={{ color: '#6B8F76' }}>(save 20%)</span></div>
             <div style={{ fontFamily: 'Fraunces, serif', fontSize: 20, fontWeight: 600, color: '#FAF9F6' }}>$47.88<span style={{ fontSize: 12, fontWeight: 400, color: '#B8C4B8' }}> / year</span></div>
           </div>
         </div>
 
         <button
-          onClick={() => router.push('/login')}
+          onClick={() => router.push('/login?mode=signup')}
           style={{ width: '100%', background: '#6B8F76', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: '15px', borderRadius: 100, border: 'none', cursor: 'pointer', marginBottom: 24 }}
         >
           Free to start. Free to keep.

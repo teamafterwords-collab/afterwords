@@ -83,7 +83,7 @@ export default function PaywallPage() {
           >
             Annual
             <div style={{ position: 'absolute', top: -10, right: -6, background: '#6B8F76', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>
-              Save 33%
+              Save 20%
             </div>
           </div>
         </div>

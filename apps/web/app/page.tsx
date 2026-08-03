@@ -109,7 +109,7 @@ export default function WelcomePage() {
               Your highlights fade. Your thinking doesn&apos;t have to.
             </div>
             <button
-              onClick={() => router.push('/login')}
+              onClick={() => router.push('/login?mode=signup')}
               style={{ width: '100%', maxWidth: 360, background: '#6B8F76', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: '15px', borderRadius: 100, border: 'none', cursor: 'pointer', marginBottom: 8 }}
             >
               Free to start. Free to keep.
@@ -498,7 +498,7 @@ export default function WelcomePage() {
         {/* 6. CTA + footer */}
         <FadeInSection>
         <button
-          onClick={() => router.push('/login')}
+          onClick={() => router.push('/login?mode=signup')}
           style={{ display: 'block', width: 'auto', maxWidth: '100%', margin: '0 auto 8px', background: '#6B8F76', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: '15px 36px', borderRadius: 100, border: 'none', cursor: 'pointer' }}
         >
           Start remembering what you read

@@ -12,7 +12,7 @@ function LoginContent() {
   const supabase = createClient()
 
   const [mode, setMode] = useState<'signup' | 'login'>(
-    searchParams.get('mode') === 'login' ? 'login' : 'signup'
+    searchParams.get('mode') === 'signup' ? 'signup' : 'login'
   )
   const [step, setStep] = useState<Step>('choice')
   const [email, setEmail] = useState('')
