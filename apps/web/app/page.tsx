@@ -112,7 +112,7 @@ export default function WelcomePage() {
               onClick={() => router.push('/login')}
               style={{ width: '100%', maxWidth: 360, background: '#6B8F76', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: '15px', borderRadius: 100, border: 'none', cursor: 'pointer', marginBottom: 8 }}
             >
-              Start Free, no credit card required
+              Free to start. Free to keep.
             </button>
             <div style={{ textAlign: 'center', fontSize: 12, color: '#8A8880' }}>
               Free for 30 days. After that, 1 free reflection a week — upgrade anytime for unlimited.

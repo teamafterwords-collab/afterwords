@@ -50,7 +50,7 @@ export default function PricingPage() {
           onClick={() => router.push('/login')}
           style={{ width: '100%', background: '#6B8F76', color: '#FAF9F6', fontWeight: 600, fontSize: 15, padding: '15px', borderRadius: 100, border: 'none', cursor: 'pointer', marginBottom: 24 }}
         >
-          Start Free, no credit card required
+          Free to start. Free to keep.
         </button>
 
         <div style={{ fontSize: 11.5, color: '#8A8880', lineHeight: 1.6, textAlign: 'center' }}>
